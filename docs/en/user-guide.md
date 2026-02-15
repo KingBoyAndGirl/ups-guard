@@ -1055,7 +1055,7 @@ GET /api/hooks/status
 ## 📞 Support & Feedback
 
 - **GitHub Issues**: https://github.com/KingBoyAndGirl/ups-guard/issues
-- **Documentation**: https://github.com/KingBoyAndGirl/ups-guard/blob/master/README.md
+- **Documentation**: https://github.com/KingBoyAndGirl/ups-guard/blob/main/README.md
 
 ---
 

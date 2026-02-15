@@ -1353,7 +1353,7 @@ GET /api/hooks/status
 ## 📞 支持与反馈
 
 - **GitHub Issues**：https://github.com/KingBoyAndGirl/ups-guard/issues
-- **文档**：https://github.com/KingBoyAndGirl/ups-guard/blob/master/README.md
+- **文档**：https://github.com/KingBoyAndGirl/ups-guard/blob/main/README.md
 
 ---
 

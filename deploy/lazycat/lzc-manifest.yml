@@ -50,7 +50,7 @@ application:
 
 services:
   ups-guard:
-    image: registry.lazycat.cloud/wtj_0527/wtjking/ups-guard:ea66ea77ec1b79e6
+    image: registry.lazycat.cloud/wtj_0527/wtjking/ups-guard:0d3062047a286b2f
     binds:
       - /lzcapp/var/data:/data
     environment:

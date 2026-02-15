@@ -1,0 +1,96 @@
+version: '3.8'
+
+# 群晖 NAS 专用 Docker Compose 配置
+#
+# 使用方法：
+# 1. 在 Container Manager 中创建新项目
+# 2. 导入此文件
+# 3. 配置环境变量
+# 4. 启动项目
+
+services:
+  nut-server:
+    image: ghcr.io/kingboyandgirl/ups-guard-nut:latest
+    container_name: ups-guard-nut
+    privileged: true
+    restart: unless-stopped
+    environment:
+      # UPS_NAME 和 UPS_DESC 留空则自动生成
+      # 自动生成格式: <品牌>_<序列号后4位> 例如: APC_0629
+      - UPS_NAME=${UPS_NAME:-}
+      - UPS_DESC=${UPS_DESC:-}
+      - UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
+      - UPS_PORT=${UPS_PORT:-auto}
+      - UPSD_LISTEN=0.0.0.0
+      - UPSD_USER=${UPSD_USER:-admin}
+      - UPSD_PASSWORD=${UPSD_PASSWORD:-secret}
+      - UPSMON_USER=${UPSMON_USER:-monuser}
+      - UPSMON_PASSWORD=${UPSMON_PASSWORD:-secret}
+      # UPS 驱动自动监控配置
+      - UPS_MONITOR_INTERVAL=${UPS_MONITOR_INTERVAL:-15}
+      - UPS_RECONNECT_DELAY=${UPS_RECONNECT_DELAY:-5}
+      - UPS_MAX_FAST_RETRIES=${UPS_MAX_FAST_RETRIES:-5}
+      - UPS_USB_SCAN_INTERVAL=${UPS_USB_SCAN_INTERVAL:-10}
+      # 日志级别: debug, info, warn, error
+      - LOG_LEVEL=${NUT_LOG_LEVEL:-info}
+    volumes:
+      # USB 设备直通（必须）
+      - /dev/bus/usb:/dev/bus/usb
+    # USB 设备热插拔支持（189 是 USB 主设备号）
+    device_cgroup_rules:
+      - 'c 189:* rmw'
+    ports:
+      - "3493:3493"
+    networks:
+      - ups-network
+    healthcheck:
+      # 健康检查：检查 upsd 进程运行且能响应请求
+      test: ["CMD-SHELL", "pgrep upsd && upsc -l localhost >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  backend:
+    image: ghcr.io/kingboyandgirl/ups-guard-backend:latest
+    container_name: ups-guard-backend
+    restart: unless-stopped
+    environment:
+      - NUT_HOST=nut-server
+      - NUT_PORT=3493
+      - NUT_USERNAME=${UPSMON_USER:-monuser}
+      - NUT_PASSWORD=${UPSMON_PASSWORD:-secret}
+      # 后端自动发现 UPS，不需要指定 UPS_NAME
+      - NUT_UPS_NAME=${UPS_NAME:-}
+      - DATABASE_PATH=/data/ups_guard.db
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MOCK_MODE=${MOCK_MODE:-false}
+      - API_TOKEN=${API_TOKEN}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    volumes:
+      # 数据持久化 - 修改为群晖上的实际路径
+      - /volume1/docker/ups-guard/data:/data
+    depends_on:
+      nut-server:
+        condition: service_healthy
+    networks:
+      - ups-network
+
+  frontend:
+    image: ghcr.io/kingboyandgirl/ups-guard-frontend:latest
+    container_name: ups-guard-frontend
+    restart: unless-stopped
+    environment:
+      - API_TOKEN=${API_TOKEN}
+    ports:
+      # 使用非标准端口避免冲突
+      - "${HTTP_PORT:-9080}:80"
+    depends_on:
+      - backend
+    networks:
+      - ups-network
+
+networks:
+  ups-network:
+    driver: bridge
+

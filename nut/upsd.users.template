@@ -1,0 +1,26 @@
+# upsd.users.template
+# UPSD 用户配置文件模板
+# 
+# 此文件由 entrypoint.sh 动态生成，无需手动编辑
+# 配置通过环境变量传递（见 .env.example）
+#
+# 格式：
+# [<username>]
+#     password = <password>
+#     actions = SET  # 允许设置变量
+#     instcmds = ALL  # 允许执行所有即时命令
+#     upsmon master|slave  # 监控模式
+#
+# 说明：
+# - 管理用户（admin）：拥有完整权限，可以执行关机等操作
+# - 监控用户（monuser）：只读权限，供后端应用连接使用
+
+[${UPSD_USER}]
+    password = ${UPSD_PASSWORD}
+    actions = SET
+    instcmds = ALL
+    upsmon master
+
+[${UPSMON_USER}]
+    password = ${UPSMON_PASSWORD}
+    upsmon slave

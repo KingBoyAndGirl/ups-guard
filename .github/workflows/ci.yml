@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-lint:
+    name: Backend Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install uv
+          cd backend
+          uv pip install --system -r pyproject.toml
+          uv pip install --system ruff
+      
+      - name: Run ruff
+        run: |
+          cd backend
+          ruff check src/
+
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          cd backend
+          source ../.venv/bin/activate
+          pip install -e .
+          pip install pytest pytest-asyncio
+      
+      - name: Run tests
+        run: |
+          cd backend
+          source ../.venv/bin/activate
+          python -m pytest tests/ -v
+
+  frontend-lint:
+    name: Frontend Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          pnpm install
+      
+      - name: Type check
+        run: |
+          cd frontend
+          pnpm run build
+
+  build-backend:
+    name: Build Backend Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build backend image
+        run: |
+          docker build -t ups-guard-backend:test ./backend
+
+  build-frontend:
+    name: Build Frontend Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build frontend image
+        run: |
+          docker build -t ups-guard-frontend:test ./frontend
+
+  build-nut:
+    name: Build NUT Server Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build NUT server image
+        run: |
+          docker build -t ups-guard-nut:test ./nut

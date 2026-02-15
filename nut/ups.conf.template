@@ -1,0 +1,24 @@
+# ups.conf.template
+# UPS 设备配置文件模板
+# 
+# 此文件由 entrypoint.sh 动态生成，无需手动编辑
+# 配置通过环境变量传递（见 .env.example）
+#
+# 格式：
+# [<ups_name>]
+#     driver = <driver_name>
+#     port = <port_or_auto>
+#     desc = "<description>"
+#
+# 示例：
+# [ups]
+#     driver = usbhid-ups
+#     port = auto
+#     desc = "My UPS Device"
+
+maxretry = 3
+
+[${UPS_NAME}]
+    driver = ${UPS_DRIVER}
+    port = ${UPS_PORT}
+    desc = "${UPS_DESC}"

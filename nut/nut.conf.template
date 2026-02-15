@@ -1,0 +1,8 @@
+# nut.conf.template
+# NUT 配置文件模板
+# 
+# 此文件由 entrypoint.sh 动态生成，无需手动编辑
+# 配置通过环境变量传递（见 .env.example）
+
+# MODE=standalone (独立模式，最常用)
+MODE=standalone

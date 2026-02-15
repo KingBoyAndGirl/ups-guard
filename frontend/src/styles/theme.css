@@ -1,0 +1,104 @@
+/**
+ * 主题系统 - 亮色和暗色模式
+ */
+
+/* 亮色主题 (默认) */
+:root {
+  /* 状态颜色 */
+  --ups-color-primary: #3B82F6;
+  --ups-color-success: #10B981;
+  --ups-color-warning: #F59E0B;
+  --ups-color-danger: #EF4444;
+  --ups-color-info: #06B6D4;
+  --ups-color-gray: #9CA3AF;
+  
+  /* 背景颜色 */
+  --ups-bg-primary: #FFFFFF;
+  --ups-bg-secondary: #F9FAFB;
+  --ups-bg-tertiary: #F3F4F6;
+  --ups-bg-card: #FFFFFF;
+  --ups-bg-hover: #F3F4F6;
+  
+  /* 文字颜色 */
+  --ups-text-primary: #111827;
+  --ups-text-secondary: #6B7280;
+  --ups-text-tertiary: #9CA3AF;
+  --ups-text-inverse: #FFFFFF;
+  
+  /* 边框颜色 */
+  --ups-border-color: #E5E7EB;
+  --ups-border-hover: #D1D5DB;
+  
+  /* 阴影 */
+  --ups-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --ups-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --ups-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  
+  /* 圆角 */
+  --ups-radius-sm: 0.375rem;
+  --ups-radius-md: 0.5rem;
+  --ups-radius-lg: 0.75rem;
+  
+  /* 间距 - 优化信息密度 */
+  --ups-spacing-xs: 0.5rem;
+  --ups-spacing-sm: 0.75rem;
+  --ups-spacing-md: 0.875rem;  /* 减小 1rem → 0.875rem */
+  --ups-spacing-lg: 1rem;      /* 减小 1.5rem → 1rem */
+  --ups-spacing-xl: 1.5rem;    /* 减小 2rem → 1.5rem */
+  
+  /* 卡片间距 - 优化布局紧凑度 */
+  --ups-card-padding: 1rem;    /* 16px, 从 24px 降低 */
+  --ups-card-gap: 0.75rem;     /* 12px, 从 24px 降低 */
+  
+  /* 响应式断点 */
+  --ups-breakpoint-mobile: 768px;
+  
+  /* 过渡动画 */
+  --ups-transition: all 0.3s ease;
+}
+
+/* 暗色主题 */
+[data-theme="dark"] {
+  /* 状态颜色 (稍微调亮以提高可读性) */
+  --ups-color-primary: #60A5FA;
+  --ups-color-success: #34D399;
+  --ups-color-warning: #FBBF24;
+  --ups-color-danger: #F87171;
+  --ups-color-info: #22D3EE;
+  --ups-color-gray: #9CA3AF;
+  
+  /* 背景颜色 */
+  --ups-bg-primary: #111827;
+  --ups-bg-secondary: #1F2937;
+  --ups-bg-tertiary: #374151;
+  --ups-bg-card: #1F2937;
+  --ups-bg-hover: #374151;
+  
+  /* 文字颜色 */
+  --ups-text-primary: #F9FAFB;
+  --ups-text-secondary: #D1D5DB;
+  --ups-text-tertiary: #9CA3AF;
+  --ups-text-inverse: #111827;
+  
+  /* 边框颜色 */
+  --ups-border-color: #374151;
+  --ups-border-hover: #4B5563;
+  
+  /* 阴影 (暗色模式下减弱) */
+  --ups-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --ups-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --ups-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* 自动过渡效果 */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* 禁用某些元素的过渡以避免闪烁 */
+*::before,
+*::after,
+img,
+video {
+  transition: none !important;
+}

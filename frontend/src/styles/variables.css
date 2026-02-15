@@ -1,0 +1,45 @@
+/**
+ * 全局样式变量 (向后兼容别名)
+ * 实际主题变量在 theme.css 中定义
+ */
+:root {
+  /* 主题颜色 */
+  --color-primary: var(--ups-color-primary);
+  --color-success: var(--ups-color-success);
+  --color-warning: var(--ups-color-warning);
+  --color-danger: var(--ups-color-danger);
+  --color-info: var(--ups-color-info);
+  --color-gray: var(--ups-color-gray);
+  
+  /* 背景颜色 */
+  --bg-primary: var(--ups-bg-primary);
+  --bg-secondary: var(--ups-bg-secondary);
+  --bg-tertiary: var(--ups-bg-tertiary);
+  --bg-hover: var(--ups-bg-hover);
+
+  /* 文字颜色 */
+  --text-primary: var(--ups-text-primary);
+  --text-secondary: var(--ups-text-secondary);
+  --text-tertiary: var(--ups-text-tertiary);
+  
+  /* 边框颜色 */
+  --border-color: var(--ups-border-color);
+  --border-hover: var(--ups-border-hover, rgba(99, 102, 241, 0.5));
+
+  /* 阴影 */
+  --shadow-sm: var(--ups-shadow-sm);
+  --shadow-md: var(--ups-shadow-md);
+  --shadow-lg: var(--ups-shadow-lg);
+  
+  /* 圆角 */
+  --radius-sm: var(--ups-radius-sm);
+  --radius-md: var(--ups-radius-md);
+  --radius-lg: var(--ups-radius-lg);
+  
+  /* 间距 */
+  --spacing-xs: var(--ups-spacing-xs);
+  --spacing-sm: var(--ups-spacing-sm);
+  --spacing-md: var(--ups-spacing-md);
+  --spacing-lg: var(--ups-spacing-lg);
+  --spacing-xl: var(--ups-spacing-xl);
+}

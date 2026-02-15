@@ -1,0 +1,116 @@
+services:
+  # NUT Server - Network UPS Tools
+  nut-server:
+    build:
+      context: ../../nut
+      dockerfile: Dockerfile
+    container_name: ups-guard-nut
+    privileged: true
+    restart: unless-stopped
+    environment:
+      # UPS_NAME 和 UPS_DESC 留空则自动生成
+      # 自动生成格式: <品牌>_<序列号后4位> 例如: APC_0629
+      - UPS_NAME=${UPS_NAME:-}
+      - UPS_DESC=${UPS_DESC:-}
+      - UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
+      - UPS_PORT=${UPS_PORT:-auto}
+      - UPSD_LISTEN=0.0.0.0
+      - UPSD_USER=${UPSD_USER:-admin}
+      - UPSD_PASSWORD=${UPSD_PASSWORD:-secret}
+      - UPSMON_USER=${UPSMON_USER:-monuser}
+      - UPSMON_PASSWORD=${UPSMON_PASSWORD:-secret}
+      # UPS 驱动自动监控配置
+      # UPS_MONITOR_INTERVAL: 驱动状态检查间隔（秒），默认 15s
+      # UPS_RECONNECT_DELAY: 基础重连延迟（秒），默认 5s，实际延迟会根据重试次数动态调整
+      # UPS_MAX_FAST_RETRIES: 快速重试次数，默认 5 次，之后降低重试频率
+      # UPS_USB_SCAN_INTERVAL: USB 设备丢失时的扫描间隔（秒），默认 10s
+      - UPS_MONITOR_INTERVAL=${UPS_MONITOR_INTERVAL:-15}
+      - UPS_RECONNECT_DELAY=${UPS_RECONNECT_DELAY:-5}
+      - UPS_MAX_FAST_RETRIES=${UPS_MAX_FAST_RETRIES:-5}
+      - UPS_USB_SCAN_INTERVAL=${UPS_USB_SCAN_INTERVAL:-10}
+      # 日志级别: debug, info, warn, error
+      - LOG_LEVEL=${NUT_LOG_LEVEL:-info}
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+    # USB 设备热插拔支持
+    # 189 是 Linux USB 子系统的固定主设备号，不需要修改
+    # 此规则允许容器访问所有 USB 设备（用于 UPS 重新插拔后自动识别）
+    device_cgroup_rules:
+      - 'c 189:* rmw'
+    ports:
+      - "3493:3493"
+    networks:
+      - ups-network
+    healthcheck:
+      # 健康检查：检查 upsd 进程运行且能响应请求
+      # 更稳定的检查方式，不会因为 UPS 断开而 unhealthy
+      test: ["CMD-SHELL", "pgrep upsd && upsc -l localhost >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Backend - FastAPI Python Backend
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: ups-guard-backend
+    restart: unless-stopped
+    environment:
+      - NUT_HOST=nut-server
+      - NUT_PORT=3493
+      - NUT_USERNAME=${UPSMON_USER:-monuser}
+      - NUT_PASSWORD=${UPSMON_PASSWORD:-secret}
+      # 后端自动发现 UPS，不需要指定 UPS_NAME
+      - NUT_UPS_NAME=${UPS_NAME:-}
+      - DATABASE_PATH=/data/ups_guard.db
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MOCK_MODE=${MOCK_MODE:-false}
+      - API_TOKEN=${API_TOKEN}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+    volumes:
+      - ups-data:/data
+    depends_on:
+      nut-server:
+        condition: service_healthy
+    networks:
+      - ups-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend - Nginx + Vue.js
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_TOKEN=${API_TOKEN:-dev-token-123}
+    container_name: ups-guard-frontend
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      - backend
+    networks:
+      - ups-network
+    healthcheck:
+      # 使用 curl 替代 wget（nginx:alpine 自带 curl）
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  ups-network:
+    driver: bridge
+
+volumes:
+  ups-data:
+    driver: local

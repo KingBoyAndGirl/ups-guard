@@ -1,0 +1,60 @@
+#file: noinspection ComposeUnknownKeys
+# UPS Guard - 懒猫微服应用清单
+lzc-sdk-version: '0.1'
+name: UPS Guard
+package: cloud.lazycat.app.ups-guard
+version: 1.0.0
+description: |
+  【1.0.0 版本】
+  专业的 UPS 智能监控与管理应用。
+  
+  【功能特点】
+  - 支持市面主流 UPS 品牌（APC、CyberPower、山特、雷迪司、伊顿等）
+  - 自动检测 USB UPS 设备，智能识别品牌和型号
+  - 实时电量监控与状态展示
+  - 智能关机保护，电池耗尽前自动安全关机
+  - 多种通知推送（微信、邮件、Webhook）
+  - 历史记录查询与数据分析
+  - 支持系统联动关机
+  - UPS 断开/重连自动恢复
+  
+  【技术特性】
+  - USB 设备直通，自动识别 UPS
+  - 后台常驻运行，持续监控
+  - 数据持久化存储
+
+license: https://choosealicense.com/licenses/agpl-3.0/
+homepage: https://github.com/KingBoyAndGirl/ups-guard
+author: 王.W
+
+application:
+  subdomain: ups-guard
+  # 单实例：UPS 监控是系统级服务
+  multi_instance: false
+  # 后台任务：保持常驻运行，不休眠
+  background_task: true
+  # USB 设备直通（挂载 /dev/bus/usb）
+  usb_bindmount: true
+  # 特权模式（访问 USB 设备需要）
+  privileged: true
+  # 访问路由：通过 services 中定义的容器提供服务
+  routes:
+    - /=http://ups-guard.cloud.lazycat.app.ups-guard.lzcapp:8000
+
+services:
+  ups-guard:
+    image: registry.lazycat.cloud/wtj_0527/wtjking/ups-guard:ea66ea77ec1b79e6
+    binds:
+      - /lzcapp/var/data:/data
+    environment:
+      - DATABASE_PATH=/data/ups_guard.db
+      - LOG_LEVEL=INFO
+      - MOCK_MODE=false
+      - NUT_HOST=127.0.0.1
+      - NUT_PORT=3493
+      - NUT_USERNAME=monuser
+      - NUT_PASSWORD=secret
+      - UPS_DRIVER=usbhid-ups
+      - UPS_PORT=auto
+      - DISABLE_SHUTDOWN=true
+      - API_TOKEN=dev-token-123

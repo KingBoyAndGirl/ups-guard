@@ -1,0 +1,58 @@
+# docker-compose.nut-only.yml
+# 仅启动 NUT 服务，用于本地开发联调
+#
+# 使用方法：
+#   cd D:\code\wtj\ups-guard\deploy\docker; docker-compose -f docker-compose.nut-only.yml down; docker-compose -f docker-compose.nut-only.yml up -d --build
+#
+# 验证（先列出发现的 UPS，再查询详情）：
+#   docker exec ups-guard-nut upsc -l localhost
+#   docker exec ups-guard-nut upsc <发现的UPS名称>@localhost
+
+services:
+  nut-server:
+    build:
+      context: ../../nut
+      dockerfile: Dockerfile
+    container_name: ups-guard-nut
+    privileged: true
+    restart: unless-stopped
+    environment:
+      # UPS_NAME 和 UPS_DESC 留空则自动生成
+      # 自动生成格式: <品牌>_<序列号后4位> 例如: APC_0629
+      - UPS_NAME=${UPS_NAME:-}
+      - UPS_DESC=${UPS_DESC:-}
+      - UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
+      - UPS_PORT=${UPS_PORT:-auto}
+      - UPSD_LISTEN=0.0.0.0
+      - UPSD_USER=${UPSD_USER:-admin}
+      - UPSD_PASSWORD=${UPSD_PASSWORD:-secret}
+      - UPSMON_USER=${UPSMON_USER:-monuser}
+      - UPSMON_PASSWORD=${UPSMON_PASSWORD:-secret}
+      # UPS 驱动自动监控配置
+      - UPS_MONITOR_INTERVAL=${UPS_MONITOR_INTERVAL:-5}       # 正常模式检查间隔（秒）
+      - UPS_RECONNECT_DELAY=${UPS_RECONNECT_DELAY:-3}         # 基础重连延迟（秒）
+      - UPS_MAX_FAST_RETRIES=${UPS_MAX_FAST_RETRIES:-5}       # 快速重试次数（0=立即切换模式）
+      - UPS_USB_SCAN_INTERVAL=${UPS_USB_SCAN_INTERVAL:-10}    # USB 扫描间隔（秒，影响热插拔响应速度）
+      # 日志级别: debug, info, warn, error
+      - LOG_LEVEL=${NUT_LOG_LEVEL:-info}
+      # 禁用自动关机（开发/测试环境设为 true，生产环境设为 false）
+      # 当设为 true 时，NUT 容器不会执行关机，关机逻辑由后端控制
+      - DISABLE_SHUTDOWN=${DISABLE_SHUTDOWN:-true}
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+    # USB 设备热插拔支持
+    # 189 是 Linux USB 子系统的固定主设备号，不需要修改
+    # 此规则允许容器访问所有 USB 设备（用于 UPS 重新插拔后自动识别）
+    device_cgroup_rules:
+      - 'c 189:* rmw'
+    ports:
+      - "3493:3493"
+    healthcheck:
+      # 健康检查：检查 upsd 进程运行且能响应请求
+      # 更稳定的检查方式，不会因为 UPS 断开而 unhealthy
+      test: ["CMD-SHELL", "pgrep upsd && upsc -l localhost >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+

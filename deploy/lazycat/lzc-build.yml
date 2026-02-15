@@ -1,0 +1,40 @@
+# UPS Guard - 懒猫微服构建配置
+# 整个文件中，可以通过 ${var} 的方式，使用 manifest 字段指定的文件定义的值
+
+# buildscript: 构建脚本
+# 使用 Docker 镜像方式部署，这里不需要构建内容目录
+# Docker 镜像构建和推送需要在本地完成，参见 build.sh/build.ps1
+buildscript: echo "Build skipped - using Docker image deployment"
+
+# manifest: 指定 lpk 包的 manifest.yml 文件路径 (相对于本文件)
+manifest: ./lzc-manifest.yml
+
+# contentdir: 指定打包的内容，将会打包到 lpk 中 (相对于本文件)
+# 使用 Docker 镜像部署时，只需要一个占位目录即可
+contentdir: ./content
+
+# pkgout: lpk 包的输出路径 (相对于本文件)
+pkgout: ./lpk/
+
+# icon: 指定 lpk 包 icon 的路径，仅允许 png 后缀 (相对于本文件)
+icon: ./lzc-icon.png
+
+# devshell: 自定义应用的开发容器环境
+devshell:
+  routes:
+    - /=http://127.0.0.1:5173
+  dependencies:
+    - bash
+    - nodejs
+    - npm
+    - python3
+    - py3-pip
+  setupscript: |
+    export npm_config_registry=https://registry.npmmirror.com
+    export PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+    cd /lzcapp/pkg/content
+    # 安装前端依赖
+    if [ -d "frontend" ]; then cd frontend && npm install && cd ..; fi
+    # 安装后端依赖  
+    if [ -d "backend" ]; then cd backend && pip install -e . && cd ..; fi
+

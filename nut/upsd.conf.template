@@ -1,0 +1,14 @@
+# upsd.conf.template
+# UPSD 服务器配置文件模板
+# 
+# 此文件由 entrypoint.sh 动态生成，无需手动编辑
+# 配置通过环境变量传递（见 .env.example）
+#
+# 格式：
+# LISTEN <address> <port>
+#
+# 示例：
+# LISTEN 0.0.0.0 3493  # 监听所有网络接口
+# LISTEN 127.0.0.1 3493  # 仅监听本地
+
+LISTEN ${UPSD_LISTEN} 3493

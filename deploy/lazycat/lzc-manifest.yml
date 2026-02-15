@@ -23,6 +23,13 @@ description: |
   - 后台常驻运行，持续监控
   - 数据持久化存储
 
+locales:
+  zh:
+    name: "UPS Guard"
+    description: "UPS Guard 是一个功能完整、安全可靠、性能优异的UPS监控解决方案。经过充分测试和优化，已达到生产就绪状态，可放心用于家庭、小型办公室或数据中心环境。"
+  en:
+    name: "UPS Guard"
+    description: "UPS Guard is a full-featured, secure, and high-performance UPS monitoring solution. Thoroughly tested and optimized, it is production-ready and can be confidently deployed in home, small office, or data center environments."
 license: https://choosealicense.com/licenses/agpl-3.0/
 homepage: https://github.com/KingBoyAndGirl/ups-guard
 author: 王.W

@@ -331,4 +331,16 @@ lzc-cli package -m lzc-manifest.yml -o ups-guard.lpk
 
 ---
 
+## ⭐ Star History
+
+<a href="https://star-history.com/#KingBoyAndGirl/ups-guard&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=KingBoyAndGirl/ups-guard&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=KingBoyAndGirl/ups-guard&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=KingBoyAndGirl/ups-guard&type=Date" />
+ </picture>
+</a>
+
+---
+
 如果这个项目对您有帮助，请给个 ⭐️ Star 支持一下！

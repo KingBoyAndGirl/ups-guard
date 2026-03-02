@@ -1,5 +1,8 @@
 <template>
   <div class="settings">
+    <!-- 隐藏的文件输入，用于导入配置 -->
+    <input ref="importFileInput" type="file" accept=".json" @change="handleImportFile" style="display: none"/>
+
     <!-- 布局重置按钮 -->
     <button
       class="layout-reset-btn"
@@ -314,7 +317,6 @@
                   <button class="btn btn-sm btn-primary" @click="exportConfig" :disabled="exporting">{{ exporting ? '导出中...' : '📥 导出配置' }}</button>
                 </div>
                 <div class="form-group">
-                  <input ref="importFileInput" type="file" accept=".json" @change="handleImportFile" style="display: none"/>
                   <button class="btn btn-sm btn-secondary" @click="triggerFileInput" :disabled="importing || validating || comparing">{{ importing ? '导入中...' : validating ? '验证中...' : '📤 导入配置' }}</button>
                   <div v-if="importPreview" class="import-preview">
                     <h4>配置预览</h4>
@@ -633,7 +635,7 @@
             >
               <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
               <h3 class="card-title">🔧 诊断工具</h3>
-              <p class="help-text" style="margin-bottom: 1rem;">导出系统诊断报告，包含系统信息、UPS 状态、完整配置、最近事件等。报告已自动脱敏。</p>
+              <p class="help-text" style="margin-bottom: 1rem;">导出系统诊断报告压缩包，包含系统信息、UPS 状态、完整配置、最近事件、NUT 参数测试报告等。报告已自动脱敏。</p>
               <button class="btn btn-secondary" @click="downloadDiagnostics" :disabled="exportingDiagnostics">{{ exportingDiagnostics ? '导出中...' : '📥 导出诊断报告' }}</button>
             </div>
 
@@ -1895,7 +1897,10 @@ const confirmExportConfig = async () => {
 
 // 触发文件选择
 const triggerFileInput = () => {
-  importFileInput.value?.click()
+  const el = importFileInput.value
+  if (el && typeof el.click === 'function') {
+    el.click()
+  }
 }
 
 // 触发私钥文件选择
@@ -2174,7 +2179,7 @@ const downloadDiagnostics = async () => {
 
     // 从响应头获取文件名
     const contentDisposition = response.headers['content-disposition']
-    let filename = 'diagnostics.json'
+    let filename = 'diagnostics.zip'
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename=(.+)/)
       if (filenameMatch && filenameMatch[1]) {

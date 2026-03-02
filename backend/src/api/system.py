@@ -6,6 +6,8 @@ import platform
 import asyncio
 import logging
 import subprocess
+import zipfile
+import tempfile
 from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -888,42 +890,129 @@ async def get_diagnostics():
         raise HTTPException(status_code=500, detail=f"生成诊断报告失败: {str(e)}")
 
 
+async def _generate_nut_parameters_report() -> str | None:
+    """
+    调用 test_nut_parameters.py 生成 NUT 参数测试报告
+
+    Returns:
+        报告的 Markdown 文本内容，失败时返回 None
+    """
+    # 定位脚本路径
+    # backend/src/api/system.py -> backend/tools/test_nut_parameters.py
+    script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    script_path = os.path.join(script_dir, "tools", "test_nut_parameters.py")
+
+    if not os.path.exists(script_path):
+        logger.warning(f"NUT 参数测试脚本不存在: {script_path}")
+        return None
+
+    try:
+        # 使用临时文件接收 Markdown 格式输出
+        with tempfile.NamedTemporaryFile(suffix=".md", delete=False, mode='w') as tmp:
+            tmp_path = tmp.name
+
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,  # 使用当前 Python 解释器
+                    script_path,
+                    "--test-all",
+                    "--output", tmp_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=script_dir,  # 设置工作目录
+            )
+
+            if result.returncode == 0 and os.path.exists(tmp_path):
+                with open(tmp_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                if content.strip():
+                    logger.info("NUT 参数测试报告生成成功")
+                    return content
+
+            # 即使脚本失败，也记录 stderr 信息作为报告内容（有诊断价值）
+            error_info = result.stderr.strip() if result.stderr else "未知错误"
+            logger.warning(f"NUT 参数测试脚本执行异常 (returncode={result.returncode}): {error_info}")
+
+            # 生成一个错误说明文件，也有诊断价值
+            return (
+                f"# NUT 参数测试报告\n\n"
+                f"> ⚠️ 脚本执行未成功，以下是错误信息：\n\n"
+                f"**返回码**: {result.returncode}\n\n"
+                f"**标准输出**:\n```\n{result.stdout[:2000] if result.stdout else '(无)'}\n```\n\n"
+                f"**标准错误**:\n```\n{error_info[:2000]}\n```\n"
+            )
+
+        finally:
+            # 清理临时文件
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+    except subprocess.TimeoutExpired:
+        logger.warning("NUT 参数测试脚本执行超时 (30s)")
+        return (
+            "# NUT 参数测试报告\n\n"
+            "> ⚠️ 脚本执行超时（30秒），可能 NUT 服务器无响应。\n"
+        )
+    except Exception as e:
+        logger.error(f"生成 NUT 参数测试报告失败: {e}")
+        return None
+
+
 @router.get("/system/diagnostics/download")
 async def download_diagnostics():
     """
-    下载诊断报告（JSON 文件）
+    下载诊断报告（ZIP 压缩包）
+
+    包含：
+    - diagnostics.json: 系统诊断报告
+    - nut-parameters-report.md: NUT 参数测试报告（如果 NUT 服务可用）
     """
     try:
-        # 获取诊断报告
+        # 1. 获取诊断报告 JSON
         diagnostics = await get_diagnostics()
-        
-        # 生成 JSON 字符串，使用自定义编码器处理特殊类型
         json_str = json.dumps(
-            diagnostics, 
-            ensure_ascii=False, 
+            diagnostics,
+            ensure_ascii=False,
             indent=2,
             cls=DiagnosticsJSONEncoder
         )
-        
-        # 创建文件流
-        file_stream = BytesIO(json_str.encode('utf-8'))
-        
-        # 生成文件名
-        filename = f"ups-guard-diagnostics-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
-        
+
+        # 2. 生成 NUT 参数测试报告
+        nut_report_content = await _generate_nut_parameters_report()
+
+        # 3. 打包为 ZIP
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # 写入诊断报告 JSON
+            zf.writestr("diagnostics.json", json_str)
+
+            # 写入 NUT 参数报告（如果生成成功）
+            if nut_report_content:
+                zf.writestr("nut-parameters-report.md", nut_report_content)
+
+        zip_buffer.seek(0)
+
+        # 4. 返回 ZIP 文件
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        filename = f"ups-guard-diagnostics-{timestamp}.zip"
+
         return StreamingResponse(
-            file_stream,
-            media_type="application/json",
+            zip_buffer,
+            media_type="application/zip",
             headers={
                 "Content-Disposition": f"attachment; filename={filename}"
             }
         )
-        
+
     except Exception as e:
-        # 记录详细错误信息以便调试
         import traceback
         error_detail = f"下载诊断报告失败: {str(e)}\n{traceback.format_exc()}"
-        print(error_detail)  # 输出到日志
+        print(error_detail)
         raise HTTPException(status_code=500, detail=f"下载诊断报告失败: {str(e)}")
 
 

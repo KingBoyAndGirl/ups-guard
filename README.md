@@ -55,14 +55,24 @@ Universal UPS monitoring and management application that supports deployment on 
 - 实时数据曲线图
 - 最近事件列表
 
+<img width="2940" height="4458" alt="image" src="https://github.com/user-attachments/assets/368003c4-2278-48d2-87a5-2b242d44613c" />
+
+<img width="2940" height="1604" alt="image" src="https://github.com/user-attachments/assets/9cb624a3-3cf9-4765-aed8-1b42a4e453b3" />
+
+
 ### 设置页面
 - 关机策略配置（等待时间、最低电量、最终等待）
 - 推送通知配置（多渠道支持）
 - 数据采样和保留设置
 
+<img width="2940" height="5530" alt="image" src="https://github.com/user-attachments/assets/9398e9f8-4608-47b4-a10a-46db0cba9b72" />
+
+
 ### 历史记录
 - 长期趋势图表（24 小时）
 - 事件时间线
+
+<img width="2940" height="2730" alt="image" src="https://github.com/user-attachments/assets/e5b13832-8392-4ac5-adc7-f5b0a1f42d49" />
 
 ## 🚀 快速开始
 

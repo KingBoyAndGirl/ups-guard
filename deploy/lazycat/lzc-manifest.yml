@@ -4,6 +4,7 @@ lzc-sdk-version: '0.1'
 name: UPS Guard
 package: cloud.lazycat.app.ups-guard
 version: 1.0.0
+min_os_version: 1.3.8
 description: |
   【1.0.0 版本】
   专业的 UPS 智能监控与管理应用。
@@ -40,10 +41,11 @@ application:
   multi_instance: false
   # 后台任务：保持常驻运行，不休眠
   background_task: true
-  # USB 设备直通（挂载 /dev/bus/usb）
-  usb_bindmount: true
-  # 特权模式（访问 USB 设备需要）
-  privileged: true
+  # 硬件加速配置
+  gpu_accel: false
+  kvm_accel: false
+  # USB 设备直通（UPS 通过 USB 连接）
+  usb_accel: true
   # 访问路由：通过 services 中定义的容器提供服务
   routes:
     - /=http://ups-guard.cloud.lazycat.app.ups-guard.lzcapp:8000

@@ -75,6 +75,7 @@
         <router-link to="/" class="navbar-brand">
           <img src="/logo.png" alt="UPS Guard" class="navbar-logo" />
           <h1>UPS Guard</h1>
+          <span v-if="systemVersion" class="version-tag">{{ systemVersion }}</span>
         </router-link>
 
         <div class="navbar-menu">
@@ -330,6 +331,9 @@ const route = useRoute()
 // 全局 Toast 通知
 const toast = useToast()
 
+// 系统版本号
+const systemVersion = ref('')
+
 // 全局 WebSocket 连接
 const { connected: wsConnected, data: wsData, connectionEvent, lastReceivedAt } = useWebSocket()
 const upsData = computed(() => wsData.value)
@@ -549,6 +553,16 @@ const formatTime = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
+// 获取系统版本号
+const fetchSystemVersion = async () => {
+  try {
+    const response = await axios.get('/health')
+    systemVersion.value = response.data.version ? `v${response.data.version}` : ''
+  } catch {
+    systemVersion.value = ''
+  }
+}
+
 const confirmCancelShutdown = async () => {
   if (isCancelling.value) return  // 防止重复点击
 
@@ -610,7 +624,8 @@ const confirmManualShutdown = async () => {
 onMounted(() => {
   configStore.init()
   fetchDevicesStatus()
-  
+  fetchSystemVersion()
+
   // 定期刷新设备状态（每分钟）
   setInterval(fetchDevicesStatus, 60000)
   
@@ -1241,6 +1256,17 @@ watch(wsData, (newData, oldData) => {
   font-weight: 700;
   color: var(--text-primary);
   transition: opacity 0.2s;
+}
+
+.navbar-brand .version-tag {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+  opacity: 0.8;
 }
 
 .navbar-brand:hover h1 {

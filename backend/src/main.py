@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 # 确保 src 目录在 Python 路径中
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import settings, get_config_manager
+from config import settings, get_config_manager, APP_VERSION
 from db.database import init_db, close_db
 from services.nut_client import create_nut_client
 from services.lzc_shutdown import create_shutdown_client
@@ -174,7 +174,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="UPS Guard API",
     description="通用 UPS 智能监控与管理应用，支持多平台部署与多设备纳管",
-    version="1.0.0",
+    version=APP_VERSION,
     lifespan=lifespan
 )
 
@@ -255,6 +255,7 @@ async def health():
     
     return {
         "status": "healthy",
+        "version": APP_VERSION,
         "monitor_running": monitor_running,
         "nut_connection": nut_status,
         "mock_mode": settings.mock_mode
@@ -283,7 +284,7 @@ async def serve_spa(request: Request, full_path: str):
     # 如果没有静态文件目录，返回 API 信息
     return {
         "name": "UPS Guard API",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "status": "running",
         "message": "Frontend not found. API is available at /api/"
     }

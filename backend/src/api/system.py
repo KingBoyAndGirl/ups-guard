@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 from services.history import get_history_service
 from services.monitor import get_monitor
 from db.database import get_db
-from config import settings, get_config_manager
+from config import settings, get_config_manager, APP_VERSION
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -766,7 +766,7 @@ async def get_diagnostics():
             pass
         
         system_info = {
-            "version": "1.0.7",
+            "version": APP_VERSION,
             "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             "os": platform.platform(),
             "uptime_seconds": uptime_seconds

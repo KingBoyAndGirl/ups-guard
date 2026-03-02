@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from models import Config, NotifierConfig
-from config import get_config_manager
+from config import get_config_manager, APP_VERSION
 from services.notifier import get_notifier_service
 import io
 
@@ -312,7 +312,7 @@ async def export_config():
     # 添加元数据
     export_data = {
         "export_time": datetime.now().isoformat(),
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "config": config_dict
     }
     

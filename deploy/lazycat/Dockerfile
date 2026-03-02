@@ -70,6 +70,10 @@ COPY backend/tools ./backend/tools
 RUN chmod +x /entrypoint.sh /app/nut/entrypoint.sh && \
     dos2unix /entrypoint.sh /app/nut/entrypoint.sh 2>/dev/null || true
 
+# 版本号通过 ARG 在构建时注入，然后设置为 ENV 供运行时使用
+ARG APP_VERSION=0.0.0
+ENV APP_VERSION=${APP_VERSION}
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

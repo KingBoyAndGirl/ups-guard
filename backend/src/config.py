@@ -1,6 +1,7 @@
 """配置管理模块"""
 import json
 import logging
+import os
 import secrets
 from pathlib import Path
 from typing import Optional, Any
@@ -8,6 +9,9 @@ from pydantic_settings import BaseSettings
 from models import Config
 
 logger = logging.getLogger(__name__)
+
+# 版本号：优先从环境变量 APP_VERSION 读取（Dockerfile 构建时注入），回退到默认值
+APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
 
 # 确定项目根目录（backend/src -> backend -> 项目根目录）
 PROJECT_ROOT = Path(__file__).parent.parent.parent

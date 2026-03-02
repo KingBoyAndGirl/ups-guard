@@ -30,6 +30,10 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY src ./src
 COPY tools ./tools
 
+# 版本号通过 ARG 在构建时注入，然后设置为 ENV 供运行时使用
+ARG APP_VERSION=0.0.0
+ENV APP_VERSION=${APP_VERSION}
+
 # 创建数据目录
 RUN mkdir -p /data
 

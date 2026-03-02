@@ -65,6 +65,7 @@ COPY deploy/lazycat/entrypoint.sh /entrypoint.sh
 COPY --from=frontend-builder /app/dist ./frontend/dist
 
 COPY backend/src ./backend/src
+COPY backend/tools ./backend/tools
 
 RUN chmod +x /entrypoint.sh /app/nut/entrypoint.sh && \
     dos2unix /entrypoint.sh /app/nut/entrypoint.sh 2>/dev/null || true

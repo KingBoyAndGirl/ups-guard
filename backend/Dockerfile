@@ -28,6 +28,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # 复制应用代码
 COPY src ./src
+COPY tools ./tools
 
 # 创建数据目录
 RUN mkdir -p /data

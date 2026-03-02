@@ -32,9 +32,11 @@ FROM python:3.11-alpine
 
 LABEL org.opencontainers.image.title="UPS Guard" \
       org.opencontainers.image.description="懒猫微服 UPS 智能监控与管理应用" \
-      org.opencontainers.image.version="1.0.0" \
       org.opencontainers.image.licenses="AGPL-3.0" \
       org.opencontainers.image.source="https://github.com/KingBoyAndGirl/ups-guard"
+
+ARG APP_VERSION=0.0.0
+LABEL org.opencontainers.image.version="${APP_VERSION}"
 
 RUN apk add --no-cache \
         nut usbutils libusb-dev eudev \

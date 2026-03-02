@@ -890,9 +890,11 @@ async def get_diagnostics():
         raise HTTPException(status_code=500, detail=f"生成诊断报告失败: {str(e)}")
 
 
-async def _generate_nut_parameters_report() -> str | None:
+def _generate_nut_parameters_report() -> str | None:
     """
     调用 test_nut_parameters.py 生成 NUT 参数测试报告
+
+    注意：此函数包含阻塞 I/O 操作，应通过 asyncio.to_thread() 调用
 
     Returns:
         报告的 Markdown 文本内容，失败时返回 None
@@ -982,8 +984,8 @@ async def download_diagnostics():
             cls=DiagnosticsJSONEncoder
         )
 
-        # 2. 生成 NUT 参数测试报告
-        nut_report_content = await _generate_nut_parameters_report()
+        # 2. 生成 NUT 参数测试报告（在线程池中执行，避免阻塞事件循环）
+        nut_report_content = await asyncio.to_thread(_generate_nut_parameters_report)
 
         # 3. 打包为 ZIP
         zip_buffer = BytesIO()

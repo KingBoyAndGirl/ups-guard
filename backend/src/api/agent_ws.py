@@ -108,10 +108,10 @@ async def _auto_register_shutdown_hook(
     """
     Agent 首次连接时，自动注册为 agent_shutdown 类型的前置关机任务。
 
-    规则：
-    - 遍历 pre_shutdown_hooks，如果已有 hook_id=="agent_shutdown"
-      且 config.agent_id 匹配，则跳过（不覆盖用户修改）。
-    - 否则创建一条新的 hook 并持久化。
+    去重规则（按优先级）：
+    1. agent_id 精确匹配 → 跳过（同一实例重连）
+    2. MAC 地址匹配 → 更新 agent_id（同一台机器换了 agent_id）
+    3. 都不匹配 → 新建
 
     Args:
         agent_id:    Agent 唯一 ID
@@ -119,21 +119,43 @@ async def _auto_register_shutdown_hook(
         system_info: Agent 上报的系统信息（含 hostname, os, os_version 等）
     """
     from config import get_config_manager
+    from api.websocket import broadcast_config_changed
 
     config_manager = await get_config_manager()
     config = await config_manager.get_config()
 
-    # 检查是否已有该 agent 的 hook
+    mac_address = system_info.get("mac_address", "").upper().strip()
+    hostname = system_info.get("hostname", "").strip()
+
     for hook in config.pre_shutdown_hooks:
-        if (
-            hook.get("hook_id") == "agent_shutdown"
-            and hook.get("config", {}).get("agent_id") == agent_id
-        ):
-            logger.debug(f"Agent {agent_id} already has a shutdown hook, skipping auto-register")
+        if hook.get("hook_id") != "agent_shutdown":
+            continue
+
+        hook_config = hook.get("config", {})
+        hook_agent_id = hook_config.get("agent_id", "")
+
+        # 规则 1：agent_id 精确匹配 → 跳过
+        if hook_agent_id == agent_id:
+            logger.debug(
+                f"Agent {agent_id} already has a shutdown hook, skipping"
+            )
             return
 
-    # 构建友好的任务名称
-    hostname = system_info.get("hostname", "")
+        # 规则 2：MAC 地址匹配 → 同一台物理机换了 agent_id，更新即可
+        hook_mac = hook_config.get("mac_address", "").upper().strip()
+        if mac_address and hook_mac and mac_address == hook_mac:
+            old_id = hook_agent_id
+            hook_config["agent_id"] = agent_id
+            await config_manager.update_config(config)
+            logger.info(
+                f"Agent {agent_id} matched existing hook by MAC={mac_address}, "
+                f"updated agent_id from {old_id}"
+            )
+            # 通知前端配置变更
+            await broadcast_config_changed()
+            return
+
+    # 规则 3：都不匹配 → 新建
     os_type = system_info.get("os", "")
 
     if hostname and os_type:
@@ -143,14 +165,8 @@ async def _auto_register_shutdown_hook(
     else:
         hook_name = agent_name
 
-    # 默认关机参数
-    default_delay = 60
-    default_message = "UPS 电量不足，系统即将安全关机"
-
-    # 计算优先级：取现有最大优先级 + 1，默认 10
     existing_priorities = [
-        h.get("priority", 10)
-        for h in config.pre_shutdown_hooks
+        h.get("priority", 10) for h in config.pre_shutdown_hooks
     ]
     next_priority = max(existing_priorities, default=9) + 1
 
@@ -161,13 +177,13 @@ async def _auto_register_shutdown_hook(
         "priority": next_priority,
         "timeout": 120,
         "on_failure": "continue",
-        "auto_registered": True,  # 标记为自动注册，便于前端区分
+        "auto_registered": True,
         "config": {
             "agent_id": agent_id,
-            "shutdown_delay": default_delay,
-            "shutdown_message": default_message,
+            "shutdown_delay": 60,
+            "shutdown_message": "UPS 电量不足，系统即将安全关机",
             "pre_commands": "",
-            "mac_address": system_info.get("mac_address", ""),
+            "mac_address": mac_address,
             "broadcast_address": "255.255.255.255",
         },
     }
@@ -179,4 +195,7 @@ async def _auto_register_shutdown_hook(
         f"Auto-registered shutdown hook for Agent {agent_id} "
         f"({hook_name}), priority={next_priority}"
     )
+
+    # 通知前端实时刷新
+    await broadcast_config_changed()
 

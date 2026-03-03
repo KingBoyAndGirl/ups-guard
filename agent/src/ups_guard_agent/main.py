@@ -6,11 +6,36 @@ import sys
 
 
 def setup_logging(debug: bool = False):
+    """配置日志：同时输出到控制台和文件"""
+    from ups_guard_agent.config import LOG_FILE
+
     level = logging.DEBUG if debug else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+    # 根 logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    # 控制台输出
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(level)
+    console_handler.setFormatter(logging.Formatter(fmt))
+    root_logger.addHandler(console_handler)
+
+    # 文件输出（5MB 轮转，保留 3 个备份）
+    try:
+        from logging.handlers import RotatingFileHandler
+        file_handler = RotatingFileHandler(
+            LOG_FILE,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3,
+            encoding="utf-8",
+        )
+        file_handler.setLevel(level)
+        file_handler.setFormatter(logging.Formatter(fmt))
+        root_logger.addHandler(file_handler)
+    except Exception as e:
+        root_logger.warning(f"Failed to create log file {LOG_FILE}: {e}")
 
 
 def interactive_setup() -> "AgentConfig":  # type: ignore[name-defined]

@@ -19,6 +19,7 @@ _DANGEROUS_PATTERNS = [
 
 async def _run(cmd: list, operation: str, power_action: bool = False) -> Dict[str, Any]:
     """使用 asyncio.create_subprocess_exec 执行命令，关机类超时视为成功"""
+    logger.info(f"Running {operation}: cmd={cmd}")
     try:
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -28,27 +29,32 @@ async def _run(cmd: list, operation: str, power_action: bool = False) -> Dict[st
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
             if process.returncode == 0:
-                return {"success": True, "message": stdout.decode(errors="replace").strip()}
+                result = {"success": True, "message": stdout.decode(errors="replace").strip()}
             else:
-                return {
+                result = {
                     "success": False,
                     "message": stderr.decode(errors="replace").strip() or f"Exit code {process.returncode}",
                 }
+            logger.info(f"{operation} result: success={result['success']} message={result['message']!r}")
+            return result
         except asyncio.TimeoutError:
             if power_action:
                 logger.info(f"{operation}: timed out, treating as success")
                 return {"success": True, "message": "Command sent (timed out, treated as success)"}
+            logger.warning(f"{operation}: timed out")
             return {"success": False, "message": f"{operation} timed out"}
     except Exception as e:
         if power_action:
             logger.info(f"{operation}: error ({e}), treating as success")
             return {"success": True, "message": f"Command sent ({e}, treated as success)"}
+        logger.warning(f"{operation}: exception: {e}")
         return {"success": False, "message": str(e)}
 
 
 async def _shutdown(params: Dict[str, Any]) -> Dict[str, Any]:
     delay = int(params.get("delay", 60))
     message = params.get("message", "UPS power lost")
+    logger.info(f"shutdown: delay={delay} message={message!r}")
     sys = platform.system()
     if sys == "Windows":
         cmd = ["shutdown", "/s", "/t", str(delay), "/f", "/c", message]
@@ -61,6 +67,7 @@ async def _shutdown(params: Dict[str, Any]) -> Dict[str, Any]:
 
 async def _reboot(params: Dict[str, Any]) -> Dict[str, Any]:
     delay = int(params.get("delay", 0))
+    logger.info(f"reboot: delay={delay}")
     sys = platform.system()
     if sys == "Windows":
         cmd = ["shutdown", "/r", "/t", str(delay), "/f"]
@@ -72,6 +79,7 @@ async def _reboot(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 async def _sleep(_params: Dict[str, Any]) -> Dict[str, Any]:
+    logger.info("sleep requested")
     sys = platform.system()
     if sys == "Windows":
         cmd = ["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"]
@@ -83,6 +91,7 @@ async def _sleep(_params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 async def _hibernate(_params: Dict[str, Any]) -> Dict[str, Any]:
+    logger.info("hibernate requested")
     sys = platform.system()
     if sys == "Windows":
         cmd = ["shutdown", "/h"]
@@ -94,6 +103,7 @@ async def _hibernate(_params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 async def _cancel_shutdown(_params: Dict[str, Any]) -> Dict[str, Any]:
+    logger.info("cancel_shutdown requested")
     sys = platform.system()
     if sys == "Windows":
         cmd = ["shutdown", "/a"]
@@ -123,6 +133,7 @@ async def _execute(params: Dict[str, Any]) -> Dict[str, Any]:
 
 async def handle_command(action: str, params: Dict[str, Any]) -> Dict[str, Any]:
     """分发命令入口"""
+    logger.info(f"Dispatching action={action} params={params}")
     handlers = {
         "shutdown": _shutdown,
         "reboot": _reboot,
@@ -133,5 +144,8 @@ async def handle_command(action: str, params: Dict[str, Any]) -> Dict[str, Any]:
     }
     handler = handlers.get(action)
     if handler is None:
+        logger.warning(f"Unknown action: {action}")
         return {"success": False, "message": f"Unknown action: {action}"}
-    return await handler(params)
+    result = await handler(params)
+    logger.info(f"Action {action} finished: success={result.get('success')} message={result.get('message', '')!r}")
+    return result

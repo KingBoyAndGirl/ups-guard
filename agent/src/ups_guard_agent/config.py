@@ -45,11 +45,16 @@ class AgentConfig:
         APP_DIR.mkdir(parents=True, exist_ok=True)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(asdict(self), f, ensure_ascii=False, indent=2)
-        logger.info(f"Config saved to {CONFIG_FILE}")
+        masked_token = (self.token[:4] + "****") if self.token else ""
+        logger.info(
+            f"Config saved to {CONFIG_FILE}: server_url={self.server_url} "
+            f"agent_id={self.agent_id} agent_name={self.agent_name} token={masked_token}"
+        )
 
     @classmethod
     def load(cls) -> "AgentConfig":
         """从文件加载配置"""
+        logger.info(f"Loading config from {CONFIG_FILE}")
         if not CONFIG_FILE.exists():
             # 兼容旧版：尝试从 ~/.ups-guard-agent/config.json 迁移
             old_config = Path.home() / ".ups-guard-agent" / "config.json"
@@ -64,10 +69,17 @@ class AgentConfig:
                 except Exception as e:
                     logger.warning(f"Failed to migrate old config: {e}")
 
+            logger.info("No config file found, creating default config")
             return cls(
                 agent_id=cls.generate_agent_id(),
                 agent_name=socket.gethostname(),
             )
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return cls(**data)
+        cfg = cls(**data)
+        masked_token = (cfg.token[:4] + "****") if cfg.token else ""
+        logger.info(
+            f"Config loaded: server_url={cfg.server_url} agent_id={cfg.agent_id} "
+            f"agent_name={cfg.agent_name} token={masked_token}"
+        )
+        return cfg

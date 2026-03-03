@@ -62,6 +62,7 @@ class TrayIcon:
 
     def start(self):
         """在独立线程中启动托盘图标"""
+        logger.info("Starting tray icon")
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -107,6 +108,7 @@ class TrayIcon:
 
     def update_status(self, status: str, detail: str = ""):
         """更新托盘图标状态"""
+        logger.info(f"Status changed: {self._status} -> {status}" + (f" ({detail})" if detail else ""))
         self._status = status
         self._detail = detail
         if self._icon:
@@ -116,6 +118,7 @@ class TrayIcon:
             self._icon.title = self._status_label()
 
     def stop(self):
+        logger.info("Stopping tray icon")
         if self._icon:
             try:
                 self._icon.stop()

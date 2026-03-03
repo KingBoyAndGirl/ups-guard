@@ -44,6 +44,7 @@ class ConfigWindow:
         from ups_guard_agent.config import AgentConfig
 
         cfg = AgentConfig.load()
+        logger.info("Opening config window")
 
         root = tk.Tk()
         self._root = root
@@ -279,29 +280,40 @@ class ConfigWindow:
 
         def _do_test():
             try:
+                import time
                 import urllib.request
                 import json
 
                 # 先测试连通性（/health 不需要认证）
                 health_url = server.rstrip("/") + "/health"
+                logger.info(f"Testing connection: GET {health_url}")
+                t0 = time.monotonic()
                 health_req = urllib.request.Request(health_url, method="GET")
                 with urllib.request.urlopen(health_req, timeout=5) as resp:
+                    elapsed_ms = int((time.monotonic() - t0) * 1000)
+                    logger.info(f"Health check: status={resp.status} elapsed={elapsed_ms}ms")
                     health_body = json.loads(resp.read())
                     version = health_body.get("version", "?")
 
                 # 再验证 Token（/api/config 需要认证）
                 config_url = server.rstrip("/") + "/api/config"
+                masked_token = (token[:4] + "****") if token else ""
+                logger.info(f"Testing token: GET {config_url} token={masked_token}")
+                t1 = time.monotonic()
                 config_req = urllib.request.Request(
                     config_url,
                     headers={"Authorization": f"Bearer {token}"},
                     method="GET",
                 )
                 with urllib.request.urlopen(config_req, timeout=5) as resp:
-                    pass  # 200 = Token 正确
+                    elapsed_ms = int((time.monotonic() - t1) * 1000)
+                    logger.info(f"Token check: status={resp.status} elapsed={elapsed_ms}ms")
 
+                logger.info(f"Connection test passed (v{version})")
                 self._update_status(f"✅ 连接成功，Token 验证通过 (v{version})", "green")
             except Exception as e:
                 err_msg = str(e)
+                logger.warning(f"Connection test failed: {err_msg}")
                 # 简化常见错误信息
                 if "urlopen error" in err_msg:
                     err_msg = "无法连接到服务器，请检查地址和网络"
@@ -361,12 +373,14 @@ class ConfigWindow:
             return
         elif result:
             # 是 — 最小化到托盘（仅关闭设置窗口）
+            logger.info("Config window minimized to tray")
             if self._root:
                 self._root.destroy()
                 self._root = None
             # 不调用 on_close，让 Agent 继续在托盘运行
         else:
             # 否 — 完全退出
+            logger.info("Config window closed, agent exiting")
             if self._root:
                 self._root.destroy()
                 self._root = None

@@ -14,10 +14,11 @@ class AuthMiddleware:
     def __init__(self, app, api_token: str):
         self.app = app
         self._api_token = api_token
-        # 开发模式下跳过认证
-        self.skip_auth = os.environ.get("MOCK_MODE", "").lower() in ("true", "1", "yes")
+        # SKIP_AUTH 独立控制，与 MOCK_MODE 解耦
+        # MOCK_MODE 只模拟 UPS 数据，不影响认证安全
+        self.skip_auth = os.environ.get("SKIP_AUTH", "").lower() in ("true", "1", "yes")
         if self.skip_auth:
-            logger.warning("MOCK_MODE enabled: API authentication is disabled")
+            logger.warning("SKIP_AUTH enabled: API authentication is disabled (development only!)")
         # Paths that don't require authentication
         self.exclude_paths = {"/health", "/", "/docs", "/openapi.json", "/redoc"}
         self.exclude_prefixes = ["/ws", "/api/bootstrap"]

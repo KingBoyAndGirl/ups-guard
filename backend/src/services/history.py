@@ -345,6 +345,7 @@ class HistoryService:
                 avg_response_time_ms, min_response_time_ms, max_response_time_ms,
                 uptime_seconds
             ))
+            # 不需要手动 commit，Database.execute() 内部已自动 commit
             logger.debug(f"Upserted monitoring stats for {date}: {communication_count} comms")
         except Exception as e:
             logger.error(f"Failed to upsert monitoring stats: {e}", exc_info=True)

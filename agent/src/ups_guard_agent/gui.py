@@ -6,6 +6,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Callable, Optional
 
+from ups_guard_agent.autostart import is_autostart_enabled, install_autostart, remove_autostart
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,7 +52,7 @@ class ConfigWindow:
         root.attributes("-topmost", True)
 
         # 居中显示 — 加宽窗口
-        win_w, win_h = 580, 420
+        win_w, win_h = 580, 470
         scr_w = root.winfo_screenwidth()
         scr_h = root.winfo_screenheight()
         x = (scr_w - win_w) // 2
@@ -137,6 +139,36 @@ class ConfigWindow:
             font=("", 8), foreground="grey", wraplength=540, justify="left",
         )
         tip.pack(padx=20, anchor="w")
+
+        # --- 开机自启复选框 ---
+        self._autostart_var = tk.BooleanVar(value=is_autostart_enabled())
+
+        def _toggle_autostart():
+            if self._autostart_var.get():
+                try:
+                    install_autostart()
+                    self._status_label.config(text="✅ 已设置开机自启", foreground="green")
+                    logger.info("Autostart enabled via GUI")
+                except Exception as e:
+                    self._status_label.config(text=f"❌ 设置失败: {e}", foreground="red")
+                    self._autostart_var.set(False)
+            else:
+                try:
+                    remove_autostart()
+                    self._status_label.config(text="✅ 已取消开机自启", foreground="green")
+                    logger.info("Autostart disabled via GUI")
+                except Exception as e:
+                    self._status_label.config(text=f"❌ 取消失败: {e}", foreground="red")
+                    self._autostart_var.set(True)
+
+        autostart_frame = ttk.Frame(root, padding=(20, 4))
+        autostart_frame.pack(fill="x")
+        ttk.Checkbutton(
+            autostart_frame,
+            text="开机自动启动",
+            variable=self._autostart_var,
+            command=_toggle_autostart,
+        ).pack(side="left")
 
         # --- 按钮栏 — 使用两行布局避免遮盖问题 ---
         btn_frame = ttk.Frame(root, padding=(20, 10))

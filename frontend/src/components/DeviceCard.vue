@@ -219,6 +219,7 @@ const icon = computed(() => {
     'qnap_shutdown': '📦',
     'http_api': '🌐',
     'custom_script': '📜',
+    'agent_shutdown': '📡',
     'lazycat_shutdown': '🐱'
   }
   return iconMap[hookId] || '📦'

@@ -42,6 +42,7 @@ import hooks.synology_shutdown  # noqa: F401
 import hooks.qnap_shutdown  # noqa: F401
 import hooks.http_api  # noqa: F401
 import hooks.custom_script  # noqa: F401
+import hooks.agent_shutdown  # noqa: F401
 from hooks.registry import get_registry
 
 # 配置日志
@@ -208,6 +209,9 @@ app.middleware("http")(AuthMiddleware(app, api_token))
 
 # 注册路由
 app.include_router(router)
+
+from api.agent_ws import router as agent_ws_router  # noqa: E402
+app.include_router(agent_ws_router)
 
 # 静态文件服务配置
 # 查找前端 dist 目录的可能位置

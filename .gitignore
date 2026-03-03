@@ -76,3 +76,11 @@ deploy/lazycat/lpk/
 tmp/
 temp/
 .tmp/
+
+# Agent build output
+agent/dist/
+agent/build/
+agent/*.spec
+
+# Agent local config
+.ups-guard-agent/

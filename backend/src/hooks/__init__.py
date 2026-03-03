@@ -7,4 +7,5 @@ from hooks import synology_shutdown
 from hooks import qnap_shutdown
 from hooks import http_api
 from hooks import custom_script
+from hooks import agent_shutdown
 

@@ -2,7 +2,10 @@
 import argparse
 import asyncio
 import logging
+import platform
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def setup_logging(debug: bool = False):
@@ -34,6 +37,7 @@ def setup_logging(debug: bool = False):
         file_handler.setLevel(level)
         file_handler.setFormatter(logging.Formatter(fmt))
         root_logger.addHandler(file_handler)
+        root_logger.info(f"Log file: {LOG_FILE}")
     except Exception as e:
         root_logger.warning(f"Failed to create log file {LOG_FILE}: {e}")
 
@@ -78,10 +82,17 @@ def _gui_setup() -> "AgentConfig":  # type: ignore[name-defined]
     return AgentConfig.load()
 
 
-def _open_settings():
+def _open_settings(client=None):
     """从托盘菜单打开设置窗口（非阻塞）"""
     from ups_guard_agent.gui import ConfigWindow
-    win = ConfigWindow()
+
+    save_callback = None
+    if client is not None:
+        def save_callback(cfg):
+            client.update_config(cfg.server_url, cfg.token, cfg.agent_id, cfg.agent_name)
+            client.reconnect()
+
+    win = ConfigWindow(on_save=save_callback)
     win.show(wait=False)
 
 
@@ -92,8 +103,10 @@ def _is_gui_available() -> bool:
         root = tk.Tk()
         root.withdraw()
         root.destroy()
+        logger.debug("GUI environment available")
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug(f"GUI environment not available: {e}")
         return False
 
 
@@ -110,20 +123,26 @@ def main():
     args = parser.parse_args()
 
     setup_logging(args.debug)
-    logger = logging.getLogger(__name__)
 
-    from ups_guard_agent.config import AgentConfig
+    logger.info(f"Python {sys.version} on {platform.platform()}")
+
+    from ups_guard_agent.config import AgentConfig, CONFIG_FILE
+
+    logger.info(f"Config file: {CONFIG_FILE}")
 
     if args.install:
+        logger.info("Installing autostart")
         from ups_guard_agent.autostart import install_autostart
         install_autostart()
         sys.exit(0)
 
     if args.uninstall:
+        logger.info("Removing autostart")
         from ups_guard_agent.autostart import remove_autostart
         remove_autostart()
         sys.exit(0)
 
+    logger.info("Loading configuration")
     cfg = AgentConfig.load()
 
     # 命令行参数覆盖配置文件
@@ -136,9 +155,12 @@ def main():
 
     # 首次运行：无有效配置时弹出配置界面
     if not cfg.server_url or not cfg.token:
+        logger.info("No valid config found, starting setup")
         if not args.no_gui and _is_gui_available():
+            logger.info("Launching GUI setup")
             cfg = _gui_setup()
         else:
+            logger.info("Launching CLI setup")
             cfg = interactive_setup()
 
     # 配置仍然无效，退出
@@ -155,8 +177,10 @@ def main():
     if not args.no_tray:
         try:
             from ups_guard_agent.tray import TrayIcon
-            tray = TrayIcon(on_settings=_open_settings)
+            # on_settings is wired to client after client is created
+            tray = TrayIcon(on_settings=None)
             tray.start()
+            logger.info("Tray icon started")
         except Exception as e:
             logger.warning(f"Tray icon unavailable: {e}")
 
@@ -171,6 +195,7 @@ def main():
 
     if tray:
         tray._on_quit = client.stop
+        tray._on_settings = lambda: _open_settings(client)
 
     asyncio.run(client.start())
 

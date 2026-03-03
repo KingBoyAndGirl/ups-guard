@@ -33,6 +33,8 @@ class AgentClient:
         self.command_handler = command_handler
         self.status_callback = status_callback
         self._running = False
+        self._ws: Optional[websockets.WebSocketClientProtocol] = None  # Current websocket connection
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     def _ws_url(self) -> str:
         base = self.server_url
@@ -41,12 +43,21 @@ class AgentClient:
             base = "wss://" + base[len("https://"):]
         elif base.startswith("http://"):
             base = "ws://" + base[len("http://"):]
-        return (
+        url = (
             f"{base}/ws/agent"
             f"?token={self.token}"
             f"&agent_id={self.agent_id}"
             f"&agent_name={self.agent_name}"
         )
+        masked_token = (self.token[:4] + "****") if self.token else ""
+        masked_url = (
+            f"{base}/ws/agent"
+            f"?token={masked_token}"
+            f"&agent_id={self.agent_id}"
+            f"&agent_name={self.agent_name}"
+        )
+        logger.debug(f"WS URL: {masked_url}")
+        return url
 
     def _update_status(self, status: str, detail: str = ""):
         if self.status_callback:
@@ -55,9 +66,33 @@ class AgentClient:
             except Exception:
                 pass
 
+    def update_config(self, server_url: str, token: str, agent_id: str, agent_name: str):
+        """更新连接配置（重连前调用）"""
+        self.server_url = server_url.rstrip("/")
+        self.token = token
+        self.agent_id = agent_id
+        self.agent_name = agent_name
+        masked_token = (token[:4] + "****") if token else ""
+        logger.info(
+            f"Config updated: server_url={server_url} agent_id={agent_id} "
+            f"agent_name={agent_name} token={masked_token}"
+        )
+
+    def reconnect(self):
+        """断开当前连接并使用新配置重连"""
+        logger.info("Reconnect requested, closing current connection")
+        if self._ws is not None and self._loop is not None:
+            asyncio.run_coroutine_threadsafe(self._ws.close(), self._loop)
+
     async def start(self):
         """带自动重连循环启动客户端"""
         self._running = True
+        self._loop = asyncio.get_running_loop()
+        masked_token = (self.token[:4] + "****") if self.token else ""
+        logger.info(
+            f"Starting AgentClient: server_url={self.server_url} "
+            f"agent_id={self.agent_id} agent_name={self.agent_name} token={masked_token}"
+        )
         delay_idx = 0
         while self._running:
             self._update_status("connecting")
@@ -75,19 +110,29 @@ class AgentClient:
             await asyncio.sleep(delay)
 
     def stop(self):
+        logger.info("Stopping AgentClient")
         self._running = False
 
     async def _connect_and_listen(self):
         """连接并监听消息"""
         url = self._ws_url()
+        masked_token = (self.token[:4] + "****") if self.token else ""
+        masked_url = url.replace(self.token, masked_token)
+        logger.info(f"Connecting to {masked_url}")
         async with websockets.connect(url) as ws:
+            self._ws = ws
             logger.info(f"Connected to {self.server_url}")
             self._update_status("connected")
 
             # 发送 register 消息（系统信息）
+            sys_info = get_system_info()
+            logger.info(
+                f"Sending register: hostname={sys_info.get('hostname')} "
+                f"os={sys_info.get('os')} ip={sys_info.get('ip_address')}"
+            )
             await ws.send(json.dumps({
                 "type": "register",
-                "data": get_system_info(),
+                "data": sys_info,
             }))
 
             # 启动心跳任务（每30秒发送 heartbeat）
@@ -99,24 +144,30 @@ class AgentClient:
                             "type": "heartbeat",
                             "data": get_runtime_info(),
                         }))
-                    except Exception:
+                        logger.debug("Heartbeat sent")
+                    except Exception as e:
+                        logger.warning(f"Heartbeat failed: {e}")
                         break
 
             hb_task = asyncio.create_task(heartbeat())
             try:
                 async for message in ws:
                     data = json.loads(message)
+                    logger.debug(f"Message received: type={data.get('type')}")
                     await self._handle_message(ws, data)
-            except ConnectionClosed:
-                logger.info("WebSocket connection closed")
+            except ConnectionClosed as e:
+                logger.info(f"WebSocket connection closed: code={e.code} reason={e.reason!r}")
             finally:
                 hb_task.cancel()
 
+            self._ws = None
             self._update_status("disconnected")
+            logger.info("Disconnected from server")
 
     async def _handle_message(self, ws, data: dict):
         msg_type = data.get("type")
         msg_data = data.get("data", {})
+        logger.debug(f"Handling message type={msg_type}")
 
         if msg_type == "ping":
             # 回复 pong，带上 request_id（用于服务端在线检测）
@@ -142,6 +193,11 @@ class AgentClient:
         except Exception as e:
             result = {"success": False, "message": str(e)}
 
+        if result.get("success"):
+            logger.info(f"Command {action} succeeded: {result.get('message', '')}")
+        else:
+            logger.warning(f"Command {action} failed: {result.get('message', '')}")
+
         try:
             await ws.send(json.dumps({
                 "type": "command_result",
@@ -151,5 +207,5 @@ class AgentClient:
                     "message": result.get("message", ""),
                 },
             }))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send command result: {e}")

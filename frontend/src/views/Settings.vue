@@ -471,6 +471,9 @@
                         <span class="hook-type-badge">{{ getHookPluginName(hook.hook_id) }}</span>
                         <span class="hook-priority-badge">优先级 {{ hook.priority }}</span>
                         <span v-if="hook.auto_registered" class="hook-auto-badge">自动注册</span>
+                        <span v-if="hook.config?.mac_address" class="wol-badge" :class="{ 'wol-disabled': hook.wol_enabled === false }">
+                          {{ hook.wol_enabled === false ? '⏻ WOL关' : '⏻ WOL' }}
+                        </span>
                       </div>
                       <div class="hook-status-row">
                         <span v-if="!hook.enabled" class="hook-status-text disabled">已禁用</span>
@@ -793,6 +796,18 @@
               <input type="checkbox" v-model="editingHook.enabled"/>
               启用此任务
             </label>
+          </div>
+
+          <!-- 来电自动唤醒开关（仅当有 MAC 地址配置字段时显示） -->
+          <div class="form-group" v-if="hookHasMacField(editingHook.hook_id)">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="editingHook.wol_enabled"/>
+              来电后自动唤醒此设备（WOL）
+            </label>
+            <small class="help-text">
+              市电恢复后自动向此设备发送 WOL 魔术包进行唤醒。
+              关闭后该设备不会被自动唤醒，但仍可手动点击"⏻ 开机"按钮唤醒。
+            </small>
           </div>
 
           <div class="form-group">
@@ -1595,6 +1610,12 @@ const getHookPluginSchema = (hookId: string): ConfigField[] => {
   return plugin?.config_schema || []
 }
 
+// 检查 hook 插件是否有 mac_address 配置字段
+const hookHasMacField = (hookId: string): boolean => {
+  const schema = getHookPluginSchema(hookId)
+  return schema.some(field => field.key === 'mac_address')
+}
+
 // 添加新 hook
 const addHook = () => {
   if (!selectedHookPlugin.value) return
@@ -1619,6 +1640,7 @@ const addHook = () => {
     priority: 10,
     timeout: 120,
     on_failure: 'continue',
+    wol_enabled: true,  // 默认开启来电自动唤醒
     config: defaultConfig
   }
   editingHookIndex.value = -1
@@ -1629,6 +1651,10 @@ const addHook = () => {
 // 编辑 hook
 const editHook = (index: number) => {
   editingHook.value = JSON.parse(JSON.stringify(config.value.pre_shutdown_hooks[index]))
+  // 如果旧配置没有 wol_enabled，补充默认值
+  if (editingHook.value.wol_enabled === undefined) {
+    editingHook.value.wol_enabled = true
+  }
   editingHookIndex.value = index
   showHookEditor.value = true
 }
@@ -3586,6 +3612,24 @@ watch(
   color: #2e7d32;
   border-radius: 12px;
   font-size: 0.75rem;
+}
+
+/* WOL 标识 */
+.wol-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+.wol-badge.wol-disabled {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+  text-decoration: line-through;
 }
 
 .hook-status-row {

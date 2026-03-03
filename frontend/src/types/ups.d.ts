@@ -142,6 +142,7 @@ export interface PreShutdownHook {
   on_failure: 'continue' | 'abort'
   config: Record<string, any>
   auto_registered?: boolean  // 标记是否为 Agent 自动注册
+  wol_enabled?: boolean  // 是否参与来电自动唤醒
 }
 
 export interface HookPlugin {

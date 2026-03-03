@@ -207,13 +207,20 @@ async def send_wol_to_devices(
         if not hook_config.get("enabled", True):
             continue
         
+        # 检查该设备是否启用了来电自动唤醒（默认 True，兼容旧配置）
+        if not hook_config.get("wol_enabled", True):
+            logger.debug(f"Skipping WOL for '{hook_config.get('name', 'Unknown')}': wol_enabled=False")
+            result["skipped"] += 1
+            continue
+
         config = hook_config.get("config", {})
         mac_address = config.get("mac_address")
         
         if mac_address:
             devices_to_wake.append({
+                "name": hook_config.get("name", "Unknown"),
                 "mac_address": mac_address,
-                "broadcast_address": config.get("broadcast_address", "255.255.255.255")
+                "broadcast_address": config.get("broadcast_address", "255.255.255.255"),
             })
     
     # 检查电压稳定性
@@ -227,7 +234,7 @@ async def send_wol_to_devices(
         
         if not voltage_stable:
             logger.warning("Voltage not stable, skipping WOL transmission to protect devices")
-            result["skipped"] = len(devices_to_wake)
+            result["skipped"] += len(devices_to_wake)
             return result
     
     # 发送 WOL 到所有设备
@@ -236,11 +243,16 @@ async def send_wol_to_devices(
         
         if success:
             result["sent"] += 1
+            logger.info(f"WOL sent to '{device['name']}' ({device['mac_address']})")
         else:
             result["failed"] += 1
     
-    # 计算没有 MAC 地址的设备
-    total_hooks = sum(1 for h in hooks_config if h.get("enabled", True))
-    result["skipped"] = total_hooks - len(devices_to_wake)
-    
+    # 计算没有 MAC 地址但 wol_enabled=True 的设备
+    total_wol_enabled = sum(
+        1 for h in hooks_config
+        if h.get("enabled", True) and h.get("wol_enabled", True)
+    )
+    no_mac_count = total_wol_enabled - len(devices_to_wake)
+    result["skipped"] += no_mac_count
+
     return result

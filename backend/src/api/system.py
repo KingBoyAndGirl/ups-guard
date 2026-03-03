@@ -344,8 +344,8 @@ async def _get_nut_status_as_logs() -> list[str]:
                 logs.append(f"[{timestamp}] 🔌 输出电压: {ups_data.output_voltage}V")
 
             # 负载
-            if ups_data.ups_load is not None:
-                logs.append(f"[{timestamp}] 📊 负载: {ups_data.ups_load}%")
+            if ups_data.load_percent is not None:
+                logs.append(f"[{timestamp}] 📊 负载: {ups_data.load_percent}%")
 
             # 最后更新时间
             if ups_data.last_update:

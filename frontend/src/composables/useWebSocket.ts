@@ -26,8 +26,8 @@ const connect = () => {
   }
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  // 添加 token 参数进行认证
-  const apiToken = import.meta.env.VITE_API_TOKEN || 'dev-token-123'
+  // 从全局变量读取 Token（由 main.ts bootstrap 时设置）
+  const apiToken = (window as any).__UPS_GUARD_TOKEN__ || import.meta.env.VITE_API_TOKEN || ''
   const wsUrl = `${protocol}//${window.location.host}/api/ws?token=${apiToken}`
 
   try {

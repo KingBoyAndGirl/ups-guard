@@ -20,7 +20,7 @@ class AuthMiddleware:
             logger.warning("MOCK_MODE enabled: API authentication is disabled")
         # Paths that don't require authentication
         self.exclude_paths = {"/health", "/", "/docs", "/openapi.json", "/redoc"}
-        self.exclude_prefixes = ["/ws"]
+        self.exclude_prefixes = ["/ws", "/api/bootstrap"]
 
     @property
     def api_token(self) -> str:

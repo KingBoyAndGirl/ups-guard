@@ -8,3 +8,7 @@ interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
+interface Window {
+  __UPS_GUARD_TOKEN__?: string
+}
+

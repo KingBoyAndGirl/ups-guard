@@ -1974,6 +1974,9 @@ const saveApiToken = async () => {
     // 更新 axios 全局 header 为新 Token（否则后续请求全部 401）
     axios.defaults.headers.common['Authorization'] = `Bearer ${updatedToken}`
 
+    // 更新全局 Token（供 WebSocket 重连使用）
+    ;(window as any).__UPS_GUARD_TOKEN__ = updatedToken
+
     // 更新显示
     apiToken.value = updatedToken
     apiTokenSource.value = 'environment'

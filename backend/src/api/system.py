@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
 from enum import Enum
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from services.history import get_history_service
 from services.monitor import get_monitor
@@ -21,6 +21,32 @@ from config import settings, get_config_manager, APP_VERSION
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.get("/bootstrap")
+async def bootstrap_token(request: Request):
+    """
+    前端启动引导接口（免认证）。
+
+    安全策略：
+    - 仅返回 Token 供同域前端使用
+    - 通过 Referer / Origin 检查限制跨域调用
+    """
+    # 可选：检查 Referer 来源（防止跨域滥用）
+    referer = request.headers.get("referer", "")
+    origin = request.headers.get("origin", "")
+    host = request.headers.get("host", "")
+
+    # 如果有 origin 且不匹配当前 host，拒绝请求
+    if origin:
+        # origin 格式如 "http://192.168.1.100:8000"，需要提取 host 部分
+        origin_host = origin.replace("http://", "").replace("https://", "").split("/")[0]
+        if host and origin_host != host:
+            logger.warning(f"Bootstrap rejected: origin={origin}, host={host}")
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+    token = settings.get_or_generate_api_token()
+    return {"token": token}
 
 
 def is_running_in_docker() -> bool:

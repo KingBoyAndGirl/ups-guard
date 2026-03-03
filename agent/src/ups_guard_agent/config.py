@@ -22,6 +22,7 @@ def _get_app_dir() -> Path:
 APP_DIR = _get_app_dir()
 CONFIG_FILE = APP_DIR / "ups-guard-agent.json"
 LOG_FILE = APP_DIR / "ups-guard-agent.log"
+STATUS_FILE = APP_DIR / "ups-guard-agent-status.json"
 
 # Agent ID 统一长度（UUID 前 12 位，含连字符，如 887bb0c1-89f）
 _AGENT_ID_LENGTH = 12

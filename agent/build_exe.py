@@ -21,6 +21,7 @@ REPO_ROOT = AGENT_DIR.parent
 LOGO_PNG = REPO_ROOT / "frontend" / "public" / "logo.png"
 ICON_ICO = AGENT_DIR / "UPSGuardAgent.ico"
 ENTRY = AGENT_DIR / "src" / "ups_guard_agent" / "main.py"
+ASSETS_DIR = AGENT_DIR / "src" / "ups_guard_agent" / "assets"
 DIST_DIR = AGENT_DIR / "dist"
 BUILD_DIR = AGENT_DIR / "build"
 OUTPUT_NAME = "UPSGuardAgent"
@@ -38,6 +39,10 @@ def convert_png_to_ico(png_path: Path, ico_path: Path) -> None:
 
 def run_pyinstaller(icon_path) -> None:
     """调用 PyInstaller 进行打包"""
+    # Bundle assets directory (logo.png etc.) for GUI window icons
+    sep = ";" if sys.platform == "win32" else ":"
+    add_data_assets = f"{ASSETS_DIR}{sep}ups_guard_agent/assets"
+
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--onefile",
@@ -45,6 +50,7 @@ def run_pyinstaller(icon_path) -> None:
         f"--name={OUTPUT_NAME}",
         f"--distpath={DIST_DIR}",
         f"--workpath={BUILD_DIR}",
+        f"--add-data={add_data_assets}",
         "--hidden-import=pystray",
         "--hidden-import=PIL",
         "--hidden-import=PIL._tkinter_finder",

@@ -11,8 +11,13 @@ if __name__ == "__main__":
 
 import argparse
 import asyncio
+import json
 import logging
+import os
 import platform
+import threading
+import time
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +128,117 @@ def _is_gui_available() -> bool:
         return False
 
 
+def _write_status_file(status: str, detail: str, agent_id: str, server_url: str) -> None:
+    """Write current connection status to shared status file for tray companion."""
+    from ups_guard_agent.config import STATUS_FILE
+    try:
+        data = {
+            "status": status,
+            "detail": detail,
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+            "pid": os.getpid(),
+            "agent_id": agent_id,
+            "server_url": server_url,
+        }
+        STATUS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        logger.debug(f"Status file written: {status}")
+    except Exception as e:
+        logger.warning(f"Failed to write status file: {e}")
+
+
+def _run_service_mode(args) -> None:
+    """Windows 服务模式：纯后台运行，无 GUI / 无托盘，负责 WebSocket 连接。
+
+    状态通过共享 JSON 文件暴露给托盘伴侣进程。
+    """
+    from ups_guard_agent.config import AgentConfig, CONFIG_FILE
+    from ups_guard_agent.commands import handle_command
+    from ups_guard_agent.client import AgentClient
+
+    log_level = "DEBUG" if args.debug else args.log_level
+    setup_logging(log_level)
+
+    logger.info(f"Service mode starting — Python {sys.version} on {platform.platform()}")
+    logger.info(f"Config file: {CONFIG_FILE}")
+
+    cfg = AgentConfig.load()
+    if args.server:
+        cfg.server_url = args.server
+    if args.token:
+        cfg.token = args.token
+    if args.name:
+        cfg.agent_name = args.name
+
+    if not cfg.server_url or not cfg.token:
+        logger.error("No valid configuration. Service cannot start.")
+        sys.exit(1)
+
+    logger.info(f"Starting service: id={cfg.agent_id} name={cfg.agent_name} server={cfg.server_url}")
+
+    def status_callback(status: str, detail: str = ""):
+        _write_status_file(status, detail, cfg.agent_id, cfg.server_url)
+
+    client = AgentClient(
+        server_url=cfg.server_url,
+        token=cfg.token,
+        agent_id=cfg.agent_id,
+        agent_name=cfg.agent_name,
+        command_handler=handle_command,
+        status_callback=status_callback,
+    )
+
+    _write_status_file("connecting", "", cfg.agent_id, cfg.server_url)
+    asyncio.run(client.start())
+
+
+def _run_tray_only_mode(args) -> None:
+    """托盘伴侣模式：用户登录后启动，轮询状态文件显示托盘图标。
+
+    不建立 WebSocket 连接，仅做状态展示和配置管理。
+    """
+    from ups_guard_agent.config import STATUS_FILE
+    from ups_guard_agent.tray import TrayIcon
+
+    log_level = "DEBUG" if args.debug else args.log_level
+    setup_logging(log_level)
+
+    logger.info(f"Tray-only mode starting — Python {sys.version} on {platform.platform()}")
+
+    tray = TrayIcon(on_settings=lambda: _open_settings(None))
+    tray.start()
+    logger.info("Tray icon started (tray-only mode)")
+
+    def _poll_status_file():
+        """轮询状态文件，每 2 秒更新一次托盘状态。"""
+        last_updated_at: str | None = None
+        while True:
+            try:
+                if STATUS_FILE.exists():
+                    data = json.loads(STATUS_FILE.read_text(encoding="utf-8"))
+                    updated_at = data.get("updated_at")
+                    if updated_at != last_updated_at:
+                        last_updated_at = updated_at
+                        tray.update_status(
+                            data.get("status", "disconnected"),
+                            data.get("detail", ""),
+                        )
+                else:
+                    tray.update_status("disconnected", "")
+            except Exception as e:
+                logger.debug(f"Error reading status file: {e}")
+            time.sleep(2)
+
+    poll_thread = threading.Thread(target=_poll_status_file, daemon=True)
+    poll_thread.start()
+
+    # Keep the main thread alive; tray runs in a daemon thread via TrayIcon.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        tray.stop()
+
+
 def main():
     parser = argparse.ArgumentParser(description="UPS Guard Agent")
     parser.add_argument("--server", help="服务器地址，如 http://192.168.1.100:8000")
@@ -130,12 +246,28 @@ def main():
     parser.add_argument("--name", help="设备名称")
     parser.add_argument("--no-tray", action="store_true", help="禁用系统托盘图标")
     parser.add_argument("--no-gui", action="store_true", help="禁用 GUI，使用命令行交互")
-    parser.add_argument("--install", action="store_true", help="安装开机自启")
-    parser.add_argument("--uninstall", action="store_true", help="移除开机自启")
+    parser.add_argument("--install", action="store_true",
+                        help="安装开机自启（Windows: 安装服务 + 注册托盘自启动）")
+    parser.add_argument("--uninstall", action="store_true",
+                        help="移除开机自启（Windows: 卸载服务 + 移除托盘自启动）")
+    parser.add_argument("--service", action="store_true",
+                        help="以 Windows 服务模式运行（无托盘、无 GUI，纯后台 WebSocket 连接）")
+    parser.add_argument("--tray-only", action="store_true",
+                        help="仅启动托盘伴侣（读取状态文件显示状态，不做 WebSocket 连接）")
     parser.add_argument("--debug", action="store_true", help="调试模式（等同于 --log-level DEBUG）")
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         default="INFO", help="日志等级（默认 INFO）")
     args = parser.parse_args()
+
+    # Service mode: pure background process, no GUI/tray
+    if args.service:
+        _run_service_mode(args)
+        return
+
+    # Tray-only mode: read status file and display tray icon
+    if args.tray_only:
+        _run_tray_only_mode(args)
+        return
 
     # --debug 优先级高于 --log-level
     log_level = "DEBUG" if args.debug else args.log_level
@@ -211,7 +343,6 @@ def main():
     from ups_guard_agent.commands import handle_command
     from ups_guard_agent.client import AgentClient
 
-
     client = AgentClient(
         server_url=cfg.server_url,
         token=cfg.token,
@@ -230,3 +361,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

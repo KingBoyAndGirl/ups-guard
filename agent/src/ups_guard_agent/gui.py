@@ -235,11 +235,20 @@ class ConfigWindow:
         # --- 开机自启复选框 ---
         self._autostart_var = tk.BooleanVar(value=is_autostart_enabled())
 
+        autostart_label = "开机自动启动"
+        autostart_hint = ""
+        if sys.platform == "win32":
+            autostart_label = "开机自动启动（需要管理员权限）"
+            autostart_hint = "将安装 Windows 服务，开机不登录也可自动运行"
+
         def _toggle_autostart():
             if self._autostart_var.get():
                 try:
                     install_autostart()
-                    self._status_label.config(text="✅ 已设置开机自启", foreground="green")
+                    if sys.platform == "win32":
+                        self._status_label.config(text="✅ 正在请求管理员权限安装服务，请在 UAC 弹窗中确认", foreground="green")
+                    else:
+                        self._status_label.config(text="✅ 已设置开机自启", foreground="green")
                     logger.info("Autostart enabled via GUI")
                 except Exception as e:
                     self._status_label.config(text=f"❌ 设置失败: {e}", foreground="red")
@@ -247,7 +256,10 @@ class ConfigWindow:
             else:
                 try:
                     remove_autostart()
-                    self._status_label.config(text="✅ 已取消开机自启", foreground="green")
+                    if sys.platform == "win32":
+                        self._status_label.config(text="✅ 正在请求管理员权限卸载服务，请在 UAC 弹窗中确认", foreground="green")
+                    else:
+                        self._status_label.config(text="✅ 已取消开机自启", foreground="green")
                     logger.info("Autostart disabled via GUI")
                 except Exception as e:
                     self._status_label.config(text=f"❌ 取消失败: {e}", foreground="red")
@@ -257,10 +269,15 @@ class ConfigWindow:
         autostart_frame.pack(fill="x")
         ttk.Checkbutton(
             autostart_frame,
-            text="开机自动启动",
+            text=autostart_label,
             variable=self._autostart_var,
             command=_toggle_autostart,
         ).pack(side="left")
+        if autostart_hint:
+            tk.Label(
+                autostart_frame, text=autostart_hint,
+                font=("", 8), foreground="grey",
+            ).pack(side="left", padx=(8, 0))
 
         # --- 按钮栏 — 使用两行布局避免遮盖问题 ---
         btn_frame = ttk.Frame(root, padding=(20, 10))

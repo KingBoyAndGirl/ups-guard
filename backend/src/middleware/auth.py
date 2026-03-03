@@ -36,7 +36,7 @@ class AuthMiddleware:
         """Process request with authentication check"""
         path = request.url.path
         
-        # 开发模式跳过所有认证
+        # SKIP_AUTH 模式跳过所有认证
         if self.skip_auth:
             return await call_next(request)
 

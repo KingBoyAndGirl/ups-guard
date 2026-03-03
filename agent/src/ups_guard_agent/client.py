@@ -119,7 +119,12 @@ class AgentClient:
         msg_data = data.get("data", {})
 
         if msg_type == "ping":
-            await ws.send(json.dumps({"type": "pong", "data": {}}))
+            # 回复 pong，带上 request_id（用于服务端在线检测）
+            request_id = msg_data.get("request_id", "")
+            await ws.send(json.dumps({
+                "type": "pong",
+                "data": {"request_id": request_id},
+            }))
 
         elif msg_type == "agent_registered":
             logger.info(f"Registered as agent: {msg_data.get('agent_id')}")

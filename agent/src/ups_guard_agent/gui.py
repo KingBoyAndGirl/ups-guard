@@ -73,6 +73,8 @@ class ConfigWindow:
             ("agent_id", "Agent ID（自动生成）", "", False),
         ]
 
+        self._hint_labels = {}  # 保存 hint label 引用
+
         for row, (key, label, hint, is_secret) in enumerate(fields):
             ttk.Label(form, text=label + "：").grid(
                 row=row, column=0, sticky="e", padx=(0, 8), pady=4
@@ -91,13 +93,31 @@ class ConfigWindow:
 
             self._entries[key] = entry
 
-            # 输入提示 — 在输入框下方显示小字提示
+            # 输入提示 — 在输入框下方显示小字提示（仅当输入框为空时显示）
             if hint and key != "agent_id":
                 hint_label = tk.Label(
                     form, text=f"  {hint}", font=("", 8),
                     foreground="grey", anchor="w",
                 )
                 hint_label.grid(row=row, column=1, sticky="sw", padx=(2, 0), pady=(22, 0))
+                self._hint_labels[key] = hint_label
+
+                # 如果已有内容，隐藏 hint
+                if current:
+                    hint_label.grid_remove()
+
+                # 绑定输入事件，动态显示/隐藏 hint
+                def make_hint_handler(k, lbl):
+                    def handler(event=None):
+                        if self._entries[k].get().strip():
+                            lbl.grid_remove()
+                        else:
+                            lbl.grid()
+                    return handler
+
+                handler = make_hint_handler(key, hint_label)
+                entry.bind("<KeyRelease>", handler)
+                entry.bind("<FocusOut>", handler)
 
         # --- Token 显示/隐藏按钮 ---
         token_entry = self._entries["token"]
@@ -260,10 +280,31 @@ class ConfigWindow:
     #  关闭
     # ------------------------------------------------------------------ #
     def _on_window_close(self):
-        if self._root:
-            self._root.destroy()
-            self._root = None
-        if self._on_close:
-            self._on_close()
+        """关闭窗口时询问用户是退出还是最小化"""
+        # 弹出三选一对话框
+        result = messagebox.askyesnocancel(
+            "关闭设置",
+            "请选择操作：\n\n"
+            "• 点击「是」— 最小化到系统托盘（后台继续运行）\n"
+            "• 点击「否」— 完全退出 Agent\n"
+            "• 点击「取消」— 返回设置窗口",
+        )
+
+        if result is None:
+            # 取消 — 不做任何操作
+            return
+        elif result:
+            # 是 — 最小化到托盘（仅关闭设置窗口）
+            if self._root:
+                self._root.destroy()
+                self._root = None
+            # 不调用 on_close，让 Agent 继续在托盘运行
+        else:
+            # 否 — 完全退出
+            if self._root:
+                self._root.destroy()
+                self._root = None
+            if self._on_close:
+                self._on_close()
 
 

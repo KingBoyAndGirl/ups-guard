@@ -132,15 +132,37 @@ class AgentConnectionManager:
             future.set_result(result)
 
     async def check_agent_online(self, agent_id: str) -> bool:
-        """发送 ping 检测 Agent 是否在线"""
+        """
+        发送 ping 并等待 pong 回复来检测 Agent 是否真正在线。
+
+        仅 send_json 成功不代表 Agent 在线（数据可能只是写入了内核缓冲区），
+        必须收到 pong 回复才能确认。
+        """
         if agent_id not in self._agents:
             return False
+
+        # 构造一个唯一的 ping request_id，复用 pending_commands 机制等待回复
+        ping_id = f"ping-{uuid.uuid4()}"
+        loop = asyncio.get_event_loop()
+        future: asyncio.Future = loop.create_future()
+        self._pending_commands[ping_id] = future
+
         try:
             ws = self._agents[agent_id].websocket
-            await ws.send_json({"type": "ping", "data": {}})
+            await ws.send_json({
+                "type": "ping",
+                "data": {"request_id": ping_id},
+            })
+            # 等待 pong 回复，最多 5 秒
+            await asyncio.wait_for(future, timeout=5.0)
             return True
-        except Exception:
+        except (asyncio.TimeoutError, Exception) as e:
+            logger.debug(f"Agent {agent_id} online check failed: {e}")
+            # Agent 无响应，清理掉已失效的连接
+            self.unregister(agent_id)
             return False
+        finally:
+            self._pending_commands.pop(ping_id, None)
 
     def list_agents(self) -> list:
         """列出所有在线 Agent 信息"""

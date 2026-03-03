@@ -61,6 +61,10 @@ async def agent_websocket(
             msg_data = data.get("data", {})
 
             if msg_type == "pong":
+                # 处理 pong 回复，用于 check_agent_online 的在线检测
+                request_id = msg_data.get("request_id", "")
+                if request_id:
+                    manager.resolve_command(request_id, {"success": True})
                 manager.update_heartbeat(agent_id)
 
             elif msg_type == "register":

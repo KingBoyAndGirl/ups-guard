@@ -470,6 +470,7 @@
                         <span class="hook-name">{{ hook.name }}</span>
                         <span class="hook-type-badge">{{ getHookPluginName(hook.hook_id) }}</span>
                         <span class="hook-priority-badge">优先级 {{ hook.priority }}</span>
+                        <span v-if="hook.auto_registered" class="hook-auto-badge">自动注册</span>
                       </div>
                       <div class="hook-status-row">
                         <span v-if="!hook.enabled" class="hook-status-text disabled">已禁用</span>
@@ -3424,6 +3425,15 @@ watch(
   padding: 0.125rem 0.5rem;
   background: var(--bg-tertiary);
   color: var(--text-secondary);
+  border-radius: 12px;
+  font-size: 0.75rem;
+}
+
+.hook-auto-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: #e8f5e9;
+  color: #2e7d32;
   border-radius: 12px;
   font-size: 0.75rem;
 }

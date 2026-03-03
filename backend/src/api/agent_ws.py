@@ -67,6 +67,16 @@ async def agent_websocket(
                 manager.update_info(agent_id, msg_data)
                 logger.info(f"Agent {agent_id} registered system info: {msg_data}")
 
+                # 自动注册为前置关机任务
+                try:
+                    await _auto_register_shutdown_hook(
+                        agent_id=agent_id,
+                        agent_name=agent_name,
+                        system_info=msg_data,
+                    )
+                except Exception as e:
+                    logger.error(f"Auto-register shutdown hook failed for {agent_id}: {e}")
+
             elif msg_type == "heartbeat":
                 manager.update_heartbeat(agent_id)
 
@@ -88,3 +98,85 @@ async def agent_websocket(
     finally:
         hb_task.cancel()
         manager.unregister(agent_id)
+
+
+async def _auto_register_shutdown_hook(
+    agent_id: str,
+    agent_name: str,
+    system_info: dict,
+) -> None:
+    """
+    Agent 首次连接时，自动注册为 agent_shutdown 类型的前置关机任务。
+
+    规则：
+    - 遍历 pre_shutdown_hooks，如果已有 hook_id=="agent_shutdown"
+      且 config.agent_id 匹配，则跳过（不覆盖用户修改）。
+    - 否则创建一条新的 hook 并持久化。
+
+    Args:
+        agent_id:    Agent 唯一 ID
+        agent_name:  Agent 名称（用户配置的设备名）
+        system_info: Agent 上报的系统信息（含 hostname, os, os_version 等）
+    """
+    from config import get_config_manager
+
+    config_manager = await get_config_manager()
+    config = await config_manager.get_config()
+
+    # 检查是否已有该 agent 的 hook
+    for hook in config.pre_shutdown_hooks:
+        if (
+            hook.get("hook_id") == "agent_shutdown"
+            and hook.get("config", {}).get("agent_id") == agent_id
+        ):
+            logger.debug(f"Agent {agent_id} already has a shutdown hook, skipping auto-register")
+            return
+
+    # 构建友好的任务名称
+    hostname = system_info.get("hostname", "")
+    os_type = system_info.get("os", "")
+
+    if hostname and os_type:
+        hook_name = f"{agent_name} ({hostname}, {os_type})"
+    elif hostname:
+        hook_name = f"{agent_name} ({hostname})"
+    else:
+        hook_name = agent_name
+
+    # 默认关机参数
+    default_delay = 60
+    default_message = "UPS 电量不足，系统即将安全关机"
+
+    # 计算优先级：取现有最大优先级 + 1，默认 10
+    existing_priorities = [
+        h.get("priority", 10)
+        for h in config.pre_shutdown_hooks
+    ]
+    next_priority = max(existing_priorities, default=9) + 1
+
+    new_hook = {
+        "enabled": True,
+        "hook_id": "agent_shutdown",
+        "name": hook_name,
+        "priority": next_priority,
+        "timeout": 120,
+        "on_failure": "continue",
+        "auto_registered": True,  # 标记为自动注册，便于前端区分
+        "config": {
+            "agent_id": agent_id,
+            "shutdown_delay": default_delay,
+            "shutdown_message": default_message,
+            "pre_commands": "",
+            "mac_address": system_info.get("mac_address", ""),
+            "broadcast_address": "255.255.255.255",
+        },
+    }
+
+    config.pre_shutdown_hooks.append(new_hook)
+    await config_manager.update_config(config)
+
+    logger.info(
+        f"Auto-registered shutdown hook for Agent {agent_id} "
+        f"({hook_name}), priority={next_priority}"
+    )
+

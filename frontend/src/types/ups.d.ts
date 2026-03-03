@@ -141,6 +141,7 @@ export interface PreShutdownHook {
   timeout: number
   on_failure: 'continue' | 'abort'
   config: Record<string, any>
+  auto_registered?: boolean  // 标记是否为 Agent 自动注册
 }
 
 export interface HookPlugin {

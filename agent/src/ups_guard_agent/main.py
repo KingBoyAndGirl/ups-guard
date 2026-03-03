@@ -1,27 +1,40 @@
 """UPS Guard Agent 入口"""
+import multiprocessing
+import sys
+
+# Windows 下 PyInstaller 打包必须在最开始调用
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    # 设置 spawn 模式，避免 fork 导致的问题
+    if sys.platform == "win32":
+        multiprocessing.set_start_method("spawn", force=True)
+
 import argparse
 import asyncio
 import logging
 import platform
-import sys
 
 logger = logging.getLogger(__name__)
 
 
-def setup_logging(debug: bool = False):
-    """配置日志：同时输出到控制台和文件"""
+def setup_logging(level: str = "INFO"):
+    """配置日志：同时输出到控制台和文件
+
+    Args:
+        level: 日志等级，可选 DEBUG, INFO, WARNING, ERROR
+    """
     from ups_guard_agent.config import LOG_FILE
 
-    level = logging.DEBUG if debug else logging.INFO
+    log_level = getattr(logging, level.upper(), logging.INFO)
     fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
     # 根 logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(level)
+    root_logger.setLevel(log_level)
 
     # 控制台输出
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
+    console_handler.setLevel(log_level)
     console_handler.setFormatter(logging.Formatter(fmt))
     root_logger.addHandler(console_handler)
 
@@ -34,7 +47,7 @@ def setup_logging(debug: bool = False):
             backupCount=3,
             encoding="utf-8",
         )
-        file_handler.setLevel(level)
+        file_handler.setLevel(log_level)
         file_handler.setFormatter(logging.Formatter(fmt))
         root_logger.addHandler(file_handler)
         root_logger.info(f"Log file: {LOG_FILE}")
@@ -119,10 +132,14 @@ def main():
     parser.add_argument("--no-gui", action="store_true", help="禁用 GUI，使用命令行交互")
     parser.add_argument("--install", action="store_true", help="安装开机自启")
     parser.add_argument("--uninstall", action="store_true", help="移除开机自启")
-    parser.add_argument("--debug", action="store_true", help="调试模式")
+    parser.add_argument("--debug", action="store_true", help="调试模式（等同于 --log-level DEBUG）")
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+                        default="INFO", help="日志等级（默认 INFO）")
     args = parser.parse_args()
 
-    setup_logging(args.debug)
+    # --debug 优先级高于 --log-level
+    log_level = "DEBUG" if args.debug else args.log_level
+    setup_logging(log_level)
 
     logger.info(f"Python {sys.version} on {platform.platform()}")
 
@@ -142,6 +159,22 @@ def main():
         remove_autostart()
         sys.exit(0)
 
+    # ============================================================
+    # 第一步：先创建托盘图标（确保用户始终能看到托盘）
+    # ============================================================
+    tray = None
+    if not args.no_tray:
+        try:
+            from ups_guard_agent.tray import TrayIcon
+            tray = TrayIcon(on_settings=None)
+            tray.start()
+            logger.info("Tray icon started")
+        except Exception as e:
+            logger.warning(f"Tray icon unavailable: {e}")
+
+    # ============================================================
+    # 第二步：加载 / 获取配置
+    # ============================================================
     logger.info("Loading configuration")
     cfg = AgentConfig.load()
 
@@ -166,23 +199,18 @@ def main():
     # 配置仍然无效，退出
     if not cfg.server_url or not cfg.token:
         logger.error("No valid configuration. Exiting.")
+        if tray:
+            tray.stop()
         sys.exit(1)
 
+    # ============================================================
+    # 第三步：启动 WebSocket 连接
+    # ============================================================
     logger.info(f"Starting UPS Guard Agent: id={cfg.agent_id} name={cfg.agent_name} server={cfg.server_url}")
 
     from ups_guard_agent.commands import handle_command
     from ups_guard_agent.client import AgentClient
 
-    tray = None
-    if not args.no_tray:
-        try:
-            from ups_guard_agent.tray import TrayIcon
-            # on_settings is wired to client after client is created
-            tray = TrayIcon(on_settings=None)
-            tray.start()
-            logger.info("Tray icon started")
-        except Exception as e:
-            logger.warning(f"Tray icon unavailable: {e}")
 
     client = AgentClient(
         server_url=cfg.server_url,

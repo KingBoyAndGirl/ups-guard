@@ -137,37 +137,48 @@ class AgentConnectionManager:
 
         仅 send_json 成功不代表 Agent 在线（数据可能只是写入了内核缓冲区），
         必须收到 pong 回复才能确认。
+
+        如果 Agent 刚连接，可能需要短暂等待才能响应，因此会进行最多 2 次重试。
         """
         if agent_id not in self._agents:
             logger.debug(f"Agent {agent_id} not in agents dict, offline")
             return False
 
-        # 构造一个唯一的 ping request_id，复用 pending_commands 机制等待回复
-        ping_id = f"ping-{uuid.uuid4()}"
-        loop = asyncio.get_event_loop()
-        future: asyncio.Future = loop.create_future()
-        self._pending_commands[ping_id] = future
+        # 最多重试 2 次（首次失败可能是 Agent 刚连接，消息循环还未就绪）
+        max_retries = 2
+        for attempt in range(max_retries):
+            # 构造一个唯一的 ping request_id，复用 pending_commands 机制等待回复
+            ping_id = f"ping-{uuid.uuid4()}"
+            loop = asyncio.get_event_loop()
+            future: asyncio.Future = loop.create_future()
+            self._pending_commands[ping_id] = future
 
-        try:
-            ws = self._agents[agent_id].websocket
-            await ws.send_json({
-                "type": "ping",
-                "data": {"request_id": ping_id},
-            })
-            # 等待 pong 回复，最多 5 秒
-            await asyncio.wait_for(future, timeout=5.0)
-            logger.debug(f"Agent {agent_id} online check: OK")
-            return True
-        except asyncio.TimeoutError:
-            logger.info(f"Agent {agent_id} online check: pong timeout (5s), cleaning up stale connection")
-            self.unregister(agent_id)
-            return False
-        except Exception as e:
-            logger.info(f"Agent {agent_id} online check failed: {e}, cleaning up")
-            self.unregister(agent_id)
-            return False
-        finally:
-            self._pending_commands.pop(ping_id, None)
+            try:
+                ws = self._agents[agent_id].websocket
+                await ws.send_json({
+                    "type": "ping",
+                    "data": {"request_id": ping_id},
+                })
+                # 等待 pong 回复，最多 3 秒
+                await asyncio.wait_for(future, timeout=3.0)
+                logger.debug(f"Agent {agent_id} online check: OK")
+                return True
+            except asyncio.TimeoutError:
+                if attempt < max_retries - 1:
+                    logger.debug(f"Agent {agent_id} online check: pong timeout, retrying ({attempt + 1}/{max_retries})...")
+                    await asyncio.sleep(0.5)  # 短暂等待后重试
+                    continue
+                logger.info(f"Agent {agent_id} online check: pong timeout after {max_retries} attempts, cleaning up stale connection")
+                self.unregister(agent_id)
+                return False
+            except Exception as e:
+                logger.info(f"Agent {agent_id} online check failed: {e}, cleaning up")
+                self.unregister(agent_id)
+                return False
+            finally:
+                self._pending_commands.pop(ping_id, None)
+
+        return False
 
     def list_agents(self) -> list:
         """列出所有在线 Agent 信息"""

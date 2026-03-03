@@ -1,14 +1,21 @@
 """图形化配置窗口（tkinter）"""
 import logging
 import socket
+import sys
 import threading
+import time
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk, messagebox
 from typing import Callable, Optional
 
 from ups_guard_agent.autostart import is_autostart_enabled, install_autostart, remove_autostart
 
 logger = logging.getLogger(__name__)
+
+# 单例锁，防止多次打开设置窗口
+_window_lock = threading.Lock()
+_window_instance: Optional["ConfigWindow"] = None
 
 
 class ConfigWindow:
@@ -22,8 +29,57 @@ class ConfigWindow:
         self._on_save = on_save
         self._on_close = on_close
         self._root: Optional[tk.Tk] = None
+        self._hidden_root: Optional[tk.Tk] = None
         self._entries: dict = {}
         self._testing = False
+        # 保持图标引用防止被垃圾回收
+        self._icon_photo_small = None
+        self._icon_photo_medium = None
+        self._icon_photo_large = None
+
+    @staticmethod
+    def _get_logo_path() -> Path:
+        """获取 logo.png 的路径"""
+        if getattr(sys, "frozen", False):
+            # PyInstaller 打包后，资源在 _MEIPASS 目录
+            base = Path(sys._MEIPASS)  # type: ignore
+        else:
+            # 源码运行
+            base = Path(__file__).parent
+        return base / "assets" / "logo.png"
+
+    def _set_window_icon(self, root: tk.Tk, hidden_root: tk.Tk = None):
+        """设置窗口图标（左上角和任务栏）"""
+        try:
+            logo_path = self._get_logo_path()
+            logger.info(f"Setting window icon from: {logo_path}, exists: {logo_path.exists()}")
+            if logo_path.exists():
+                # 使用 Pillow 加载 PNG 并转换为 PhotoImage
+                from PIL import Image, ImageTk
+                img = Image.open(logo_path)
+
+                # 创建多个尺寸的图标（Windows 需要不同尺寸）
+                # 小图标用于窗口左上角，大图标用于任务栏
+                img_small = img.resize((16, 16), Image.Resampling.LANCZOS)
+                img_medium = img.resize((32, 32), Image.Resampling.LANCZOS)
+                img_large = img.resize((48, 48), Image.Resampling.LANCZOS)
+
+                self._icon_photo_small = ImageTk.PhotoImage(img_small)
+                self._icon_photo_medium = ImageTk.PhotoImage(img_medium)
+                self._icon_photo_large = ImageTk.PhotoImage(img_large)
+
+                # 设置 Toplevel 窗口图标（传入多个尺寸）
+                root.iconphoto(True, self._icon_photo_large, self._icon_photo_medium, self._icon_photo_small)
+
+                # 同时设置隐藏根窗口的图标（Windows 任务栏显示的是根窗口图标）
+                if hidden_root:
+                    hidden_root.iconphoto(True, self._icon_photo_large, self._icon_photo_medium, self._icon_photo_small)
+
+                logger.info(f"Window icon set successfully from {logo_path}")
+            else:
+                logger.warning(f"Logo not found: {logo_path}")
+        except Exception as e:
+            logger.warning(f"Failed to set window icon: {e}")
 
     def show(self, wait: bool = False):
         """
@@ -32,10 +88,36 @@ class ConfigWindow:
         Args:
             wait: True 时阻塞直到窗口关闭（首次配置场景）
         """
+        global _window_instance
+
+        with _window_lock:
+            # 如果已有窗口打开，尝试将其置顶
+            if _window_instance is not None and _window_instance._root is not None:
+                try:
+                    # 使用 after 在 tkinter 主线程中执行置顶操作
+                    _window_instance._root.after(0, _window_instance._bring_to_front)
+                    logger.debug("Config window already open, bringing to front")
+                    return
+                except Exception:
+                    # 窗口可能已销毁，继续创建新窗口
+                    _window_instance = None
+
+            _window_instance = self
+
         if wait:
             self._build_and_run()
         else:
             threading.Thread(target=self._build_and_run, daemon=True).start()
+
+    def _bring_to_front(self):
+        """将窗口置顶（必须在 tkinter 主线程调用）"""
+        if self._root:
+            try:
+                self._root.deiconify()  # 如果最小化了，恢复
+                self._root.lift()
+                self._root.focus_force()
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------ #
     #  窗口构建
@@ -46,11 +128,16 @@ class ConfigWindow:
         cfg = AgentConfig.load()
         logger.info("Opening config window")
 
+        # 创建主窗口
         root = tk.Tk()
         self._root = root
+        self._hidden_root = None
+
         root.title("UPS Guard Agent — 设置")
         root.resizable(False, False)
-        root.attributes("-topmost", True)
+
+        # 设置窗口图标
+        self._set_window_icon(root, None)
 
         # 居中显示 — 加宽窗口
         win_w, win_h = 580, 470
@@ -59,6 +146,10 @@ class ConfigWindow:
         x = (scr_w - win_w) // 2
         y = (scr_h - win_h) // 2
         root.geometry(f"{win_w}x{win_h}+{x}+{y}")
+
+        # 延迟设置置顶
+        root.after(100, lambda: root.attributes("-topmost", True))
+        root.after(500, lambda: root.attributes("-topmost", False))
 
         # --- 标题 ---
         title = tk.Label(root, text="⚡ UPS Guard Agent 配置", font=("", 14, "bold"))
@@ -217,6 +308,9 @@ class ConfigWindow:
             return
 
         cfg = AgentConfig.load()
+        old_server = cfg.server_url
+        old_token = cfg.token
+
         cfg.server_url = server
         cfg.token = token
         cfg.agent_name = name or socket.gethostname()
@@ -234,6 +328,11 @@ class ConfigWindow:
 
         if self._on_save:
             self._on_save(cfg)
+
+        # 首次配置（之前没有有效配置）：保存后自动关闭窗口，让程序继续连接
+        if not old_server or not old_token:
+            logger.info("First-time config saved, closing window to start connection")
+            self._root.after(500, self._on_window_close)  # 延迟 0.5 秒关闭，让用户看到保存成功提示
 
     # ------------------------------------------------------------------ #
     #  重置 Agent ID — 使用与 config.py 一致的长度
@@ -357,10 +456,22 @@ class ConfigWindow:
     #  关闭
     # ------------------------------------------------------------------ #
     def _on_window_close(self):
-        """关闭窗口时询问用户是退出还是最小化"""
-        logger.info("Settings window closed, minimizing to tray")
+        """关闭窗口时清理资源"""
+        global _window_instance
+
+        logger.info("Settings window closed")
         if self._root:
             self._root.destroy()
             self._root = None
+
+        # 销毁隐藏的根窗口（结束 mainloop）
+        if hasattr(self, '_hidden_root') and self._hidden_root:
+            self._hidden_root.destroy()
+            self._hidden_root = None
+
+        # 清除单例引用，允许再次打开窗口
+        with _window_lock:
+            if _window_instance is self:
+                _window_instance = None
 
 

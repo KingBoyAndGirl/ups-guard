@@ -186,3 +186,40 @@ async def get_config_manager() -> ConfigManager:
         db = await get_db()
         config_manager = ConfigManager(db)
     return config_manager
+
+
+def persist_api_token(new_token: str) -> None:
+    """
+    将 API Token 写入 .env 文件以实现持久化。
+
+    如果 .env 中已有 API_TOKEN 行则替换，否则追加。
+
+    Args:
+        new_token: 新的 API Token
+    """
+    env_path = ENV_FILE
+    lines: list[str] = []
+
+    if env_path.exists():
+        lines = env_path.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    found = False
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith("API_TOKEN=") or stripped.startswith("API_TOKEN ="):
+            lines[i] = f"API_TOKEN={new_token}\n"
+            found = True
+            break
+
+    if not found:
+        # 确保前面有换行
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        lines.append(f"API_TOKEN={new_token}\n")
+
+    env_path.write_text("".join(lines), encoding="utf-8")
+
+    # 同步更新 settings 实例
+    settings.api_token = new_token
+    logger.info("API Token persisted to .env")
+

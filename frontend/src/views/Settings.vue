@@ -623,7 +623,7 @@
               </div>
             </div>
 
-            <!-- 诊断工具卡片 -->
+            <!-- 安全与诊断卡片 -->
             <div
               v-else-if="cardId === 'security'"
               class="card settings-diagnostics draggable-card"
@@ -635,6 +635,59 @@
               @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
             >
               <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+
+              <!-- API Token 管理 -->
+              <h3 class="card-title">🔑 API Token</h3>
+              <p class="help-text" style="margin-bottom: 0.5rem;">Agent 客户端连接时需要此 Token 进行认证。</p>
+
+              <div class="token-section">
+                <!-- 显示/隐藏 Token -->
+                <div class="token-input-group">
+                  <input
+                    type="text"
+                    class="form-control token-field"
+                    :value="showApiToken ? apiToken : '••••••••••••••••••••••••'"
+                    readonly
+                  />
+                  <button class="btn btn-secondary btn-sm" @click="toggleApiToken" :disabled="loadingApiToken">
+                    {{ loadingApiToken ? '…' : (showApiToken ? '🙈 隐藏' : '👁 显示') }}
+                  </button>
+                  <button
+                    v-if="showApiToken && apiToken"
+                    class="btn btn-secondary btn-sm"
+                    @click="copyApiToken"
+                  >📋 复制</button>
+                </div>
+                <small v-if="apiTokenSource" class="help-text">
+                  来源：{{ apiTokenSource === 'environment' ? '环境变量 / .env 文件' : '自动生成（建议点击下方「保存」固定）' }}
+                </small>
+
+                <!-- 修改 Token -->
+                <div class="token-edit-group">
+                  <input
+                    v-model="newApiToken"
+                    type="text"
+                    class="form-control token-edit-field"
+                    placeholder="输入新 Token（留空则自动生成）"
+                    :disabled="savingApiToken"
+                  />
+                  <button
+                    class="btn btn-primary btn-sm"
+                    @click="saveApiToken"
+                    :disabled="savingApiToken"
+                  >{{ savingApiToken ? '保存中…' : '💾 保存' }}</button>
+                  <button
+                    class="btn btn-secondary btn-sm"
+                    @click="resetApiToken"
+                    :disabled="savingApiToken"
+                  >🔄 随机生成</button>
+                </div>
+                <small class="help-text warning-text">⚠️ 修改 Token 后需在 Agent 客户端中同步更新，否则 Agent 无法连接。</small>
+              </div>
+
+              <hr class="section-divider" />
+
+              <!-- 诊断工具 -->
               <h3 class="card-title">🔧 诊断工具</h3>
               <p class="help-text" style="margin-bottom: 1rem;">导出系统诊断报告压缩包，包含系统信息、UPS 状态、完整配置、最近事件、NUT 参数测试报告等。报告已自动脱敏。</p>
               <button class="btn btn-secondary" @click="downloadDiagnostics" :disabled="exportingDiagnostics">{{ exportingDiagnostics ? '导出中...' : '📥 导出诊断报告' }}</button>
@@ -1835,6 +1888,92 @@ const comparisonData = ref<any>(null)
 const showExportConfirm = ref(false)
 const selectedFields = ref<Record<string, boolean>>({})
 const selectAllFields = ref(true)
+
+// ========== API Token 管理 ==========
+const apiToken = ref('')
+const apiTokenSource = ref('')
+const showApiToken = ref(false)
+const loadingApiToken = ref(false)
+const newApiToken = ref('')
+const savingApiToken = ref(false)
+
+const toggleApiToken = async () => {
+  if (showApiToken.value) {
+    showApiToken.value = false
+    return
+  }
+
+  if (!apiToken.value) {
+    loadingApiToken.value = true
+    try {
+      const resp = await axios.get('/api/system/api-token')
+      apiToken.value = resp.data.token
+      apiTokenSource.value = resp.data.source
+    } catch (error: any) {
+      toast.error('获取 Token 失败：' + (error.response?.data?.detail || error.message))
+      loadingApiToken.value = false
+      return
+    }
+    loadingApiToken.value = false
+  }
+
+  showApiToken.value = true
+}
+
+const copyApiToken = async () => {
+  if (!apiToken.value) return
+  try {
+    await navigator.clipboard.writeText(apiToken.value)
+    toast.success('Token 已复制到剪贴板')
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = apiToken.value
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    toast.success('Token 已复制到剪贴板')
+  }
+}
+
+const saveApiToken = async () => {
+  savingApiToken.value = true
+  try {
+    const resp = await axios.put('/api/system/api-token', {
+      token: newApiToken.value.trim()
+    })
+
+    const updatedToken = resp.data.token
+
+    // 更新 axios 全局 header 为新 Token（否则后续请求全部 401）
+    axios.defaults.headers.common['Authorization'] = `Bearer ${updatedToken}`
+
+    // 更新显示
+    apiToken.value = updatedToken
+    apiTokenSource.value = 'environment'
+    showApiToken.value = true
+    newApiToken.value = ''
+
+    toast.success('Token 已更新，请在 Agent 客户端中同步修改')
+  } catch (error: any) {
+    toast.error('修改 Token 失败：' + (error.response?.data?.detail || error.message))
+  } finally {
+    savingApiToken.value = false
+  }
+}
+
+const resetApiToken = () => {
+  // 随机生成一个 Token 填入输入框（不立即保存）
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+  let token = ''
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  for (const byte of array) {
+    token += chars[byte % chars.length]
+  }
+  newApiToken.value = token
+  toast.info('已生成随机 Token，点击「保存」生效')
+}
 
 // 计算选中的字段数
 const selectedFieldsCount = computed(() => {
@@ -3847,5 +3986,57 @@ watch(
   font-size: 0.75rem;
   color: var(--color-primary);
   font-style: italic;
+}
+
+/* API Token 管理 */
+.token-section {
+  margin-bottom: 1rem;
+}
+
+.token-input-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.token-edit-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.token-field {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  background: var(--bg-secondary, #f5f5f5);
+  border: 1px solid var(--border-color, #ddd);
+  cursor: default;
+}
+
+.token-edit-field {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  margin: 1.2rem 0;
+}
+
+.warning-text {
+  color: #f59e0b;
 }
 </style>

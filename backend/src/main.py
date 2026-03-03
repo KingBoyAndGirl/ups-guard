@@ -203,9 +203,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 添加认证中间件
+# 添加认证中间件（保存引用以便运行时更新 Token）
 api_token = settings.get_or_generate_api_token()
-app.middleware("http")(AuthMiddleware(app, api_token))
+auth_middleware = AuthMiddleware(app, api_token)
+app.middleware("http")(auth_middleware)
 
 # 注册路由
 app.include_router(router)

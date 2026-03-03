@@ -14,7 +14,7 @@ def setup_logging(debug: bool = False):
 
 
 def interactive_setup() -> "AgentConfig":  # type: ignore[name-defined]
-    """首次运行交互式配置"""
+    """命令行交互式配置（CLI 模式兜底）"""
     from ups_guard_agent.config import AgentConfig
 
     print("=== UPS Guard Agent 初始配置 ===")
@@ -32,12 +32,53 @@ def interactive_setup() -> "AgentConfig":  # type: ignore[name-defined]
     return cfg
 
 
+def _gui_setup() -> "AgentConfig":  # type: ignore[name-defined]
+    """GUI 配置窗口（打包 exe 时使用）"""
+    from ups_guard_agent.config import AgentConfig
+
+    saved_cfg = None
+
+    def on_save(cfg):
+        nonlocal saved_cfg
+        saved_cfg = cfg
+
+    from ups_guard_agent.gui import ConfigWindow
+    win = ConfigWindow(on_save=on_save)
+    win.show(wait=True)  # 阻塞直到窗口关闭
+
+    if saved_cfg and saved_cfg.server_url and saved_cfg.token:
+        return saved_cfg
+
+    # 用户关闭窗口但没保存有效配置
+    return AgentConfig.load()
+
+
+def _open_settings():
+    """从托盘菜单打开设置窗口（非阻塞）"""
+    from ups_guard_agent.gui import ConfigWindow
+    win = ConfigWindow()
+    win.show(wait=False)
+
+
+def _is_gui_available() -> bool:
+    """检测是否有 GUI 环境（打包 exe 或桌面环境）"""
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        root.destroy()
+        return True
+    except Exception:
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="UPS Guard Agent")
     parser.add_argument("--server", help="服务器地址，如 http://192.168.1.100:8000")
     parser.add_argument("--token", help="API Token")
     parser.add_argument("--name", help="设备名称")
     parser.add_argument("--no-tray", action="store_true", help="禁用系统托盘图标")
+    parser.add_argument("--no-gui", action="store_true", help="禁用 GUI，使用命令行交互")
     parser.add_argument("--install", action="store_true", help="安装开机自启")
     parser.add_argument("--uninstall", action="store_true", help="移除开机自启")
     parser.add_argument("--debug", action="store_true", help="调试模式")
@@ -68,9 +109,17 @@ def main():
     if args.name:
         cfg.agent_name = args.name
 
-    # 首次运行交互式配置
+    # 首次运行：无有效配置时弹出配置界面
     if not cfg.server_url or not cfg.token:
-        cfg = interactive_setup()
+        if not args.no_gui and _is_gui_available():
+            cfg = _gui_setup()
+        else:
+            cfg = interactive_setup()
+
+    # 配置仍然无效，退出
+    if not cfg.server_url or not cfg.token:
+        logger.error("No valid configuration. Exiting.")
+        sys.exit(1)
 
     logger.info(f"Starting UPS Guard Agent: id={cfg.agent_id} name={cfg.agent_name} server={cfg.server_url}")
 
@@ -81,7 +130,7 @@ def main():
     if not args.no_tray:
         try:
             from ups_guard_agent.tray import TrayIcon
-            tray = TrayIcon()
+            tray = TrayIcon(on_settings=_open_settings)
             tray.start()
         except Exception as e:
             logger.warning(f"Tray icon unavailable: {e}")

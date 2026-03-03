@@ -4,11 +4,13 @@ import uuid
 import socket
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Optional
 
 
 CONFIG_DIR = Path.home() / ".ups-guard-agent"
 CONFIG_FILE = CONFIG_DIR / "config.json"
+
+# Agent ID 统一长度（UUID 前 12 位，含连字符，如 887bb0c1-89f）
+_AGENT_ID_LENGTH = 12
 
 
 @dataclass
@@ -18,6 +20,11 @@ class AgentConfig:
     token: str = ""
     agent_id: str = ""
     agent_name: str = ""
+
+    @staticmethod
+    def generate_agent_id() -> str:
+        """生成 Agent ID（统一使用此方法，避免长度不一致）"""
+        return str(uuid.uuid4())[:_AGENT_ID_LENGTH]
 
     def save(self):
         """保存配置到文件"""
@@ -30,7 +37,7 @@ class AgentConfig:
         """从文件加载配置"""
         if not CONFIG_FILE.exists():
             return cls(
-                agent_id=str(uuid.uuid4())[:12],
+                agent_id=cls.generate_agent_id(),
                 agent_name=socket.gethostname(),
             )
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:

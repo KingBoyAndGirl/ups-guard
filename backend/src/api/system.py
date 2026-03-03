@@ -1093,3 +1093,72 @@ async def get_monitoring_stats_history(
     except Exception as e:
         logger.error(f"Failed to get monitoring stats history: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve monitoring statistics")
+
+
+@router.get("/system/api-token")
+async def get_api_token():
+    """
+    获取当前 API Token。
+
+    此接口本身受 Bearer Token 保护，只有已持有有效 Token 的用户才能调用。
+    用于在 Web 界面展示 Token，方便用户复制给 Agent 客户端使用。
+    """
+    token = settings.get_or_generate_api_token()
+    return {
+        "token": token,
+        "source": "environment" if settings.api_token else "auto_generated",
+    }
+
+
+@router.put("/system/api-token")
+async def update_api_token(payload: dict):
+    """
+    修改或重置 API Token。
+
+    请求体:
+        - token: 新的 Token 字符串（可选，为空时自动生成）
+
+    注意:
+        - 修改后当前页面的 Token 立即失效，前端需使用新 Token 重新认证
+        - 新 Token 会写入 .env 文件持久化
+    """
+    import secrets as _secrets
+    from config import persist_api_token
+
+    new_token = (payload.get("token") or "").strip()
+
+    # 验证自定义 Token
+    if new_token:
+        if len(new_token) < 8:
+            raise HTTPException(
+                status_code=400,
+                detail="Token 长度不能少于 8 个字符",
+            )
+        if len(new_token) > 128:
+            raise HTTPException(
+                status_code=400,
+                detail="Token 长度不能超过 128 个字符",
+            )
+    else:
+        # 自动生成
+        new_token = _secrets.token_urlsafe(32)
+
+    # 1. 持久化到 .env 并更新 settings
+    persist_api_token(new_token)
+
+    # 2. 热更新中间件中的 Token
+    try:
+        from main import auth_middleware
+        auth_middleware.api_token = new_token
+    except ImportError:
+        logger.warning("Cannot hot-update auth middleware token")
+
+    logger.info("API Token updated via Web UI")
+
+    return {
+        "token": new_token,
+        "source": "environment",
+        "message": "Token 已更新，请使用新 Token 重新认证",
+    }
+
+

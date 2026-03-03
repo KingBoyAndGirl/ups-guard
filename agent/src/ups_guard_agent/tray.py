@@ -48,10 +48,15 @@ class TrayIcon:
         "disconnected": "已断开",
     }
 
-    def __init__(self, on_quit: Optional[Callable] = None):
+    def __init__(
+        self,
+        on_quit: Optional[Callable] = None,
+        on_settings: Optional[Callable] = None,
+    ):
         self._status = "disconnected"
         self._detail = ""
         self._on_quit = on_quit
+        self._on_settings = on_settings
         self._icon = None
         self._thread: Optional[threading.Thread] = None
 
@@ -70,6 +75,10 @@ class TrayIcon:
                 if self._on_quit:
                     self._on_quit()
 
+            def settings_action(icon, item):
+                if self._on_settings:
+                    self._on_settings()
+
             img = _make_icon(self._status)
             if img is None:
                 logger.warning("Cannot create tray icon image")
@@ -81,6 +90,8 @@ class TrayIcon:
                 "UPS Guard Agent",
                 menu=Menu(
                     MenuItem(lambda text: self._status_label(), None, enabled=False),
+                    Menu.SEPARATOR,
+                    MenuItem("⚙ 设置", settings_action),
                     MenuItem("退出", quit_action),
                 ),
             )

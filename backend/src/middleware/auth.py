@@ -9,11 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 class AuthMiddleware:
-    """Bearer Token Authentication Middleware"""
-    
+    """Bearer Token Authentication Middleware（支持 Token 热更新）"""
+
     def __init__(self, app, api_token: str):
         self.app = app
-        self.api_token = api_token
+        self._api_token = api_token
         # 开发模式下跳过认证
         self.skip_auth = os.environ.get("MOCK_MODE", "").lower() in ("true", "1", "yes")
         if self.skip_auth:
@@ -21,7 +21,16 @@ class AuthMiddleware:
         # Paths that don't require authentication
         self.exclude_paths = {"/health", "/", "/docs", "/openapi.json", "/redoc"}
         self.exclude_prefixes = ["/ws"]
-    
+
+    @property
+    def api_token(self) -> str:
+        return self._api_token
+
+    @api_token.setter
+    def api_token(self, value: str):
+        self._api_token = value
+        logger.info("AuthMiddleware: api_token updated at runtime")
+
     async def __call__(self, request: Request, call_next: Callable):
         """Process request with authentication check"""
         path = request.url.path
@@ -63,7 +72,7 @@ class AuthMiddleware:
                 )
             
             token = parts[1]
-            if token != self.api_token:
+            if token != self._api_token:
                 logger.warning(f"Unauthorized access attempt to {path}: Invalid token")
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,

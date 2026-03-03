@@ -174,9 +174,10 @@ class ConfigWindow:
         btn_frame = ttk.Frame(root, padding=(20, 10))
         btn_frame.pack(fill="x", side="bottom")
 
-        # 第一行：状态标签
+        # 第一行：状态标签（右键可复制）
         self._status_label = ttk.Label(btn_frame, text="", foreground="grey", wraplength=540)
         self._status_label.pack(fill="x", pady=(0, 6))
+        self._status_label.bind("<Button-3>", self._show_status_menu)
 
         # 第二行：按钮
         btn_row = ttk.Frame(btn_frame)
@@ -307,6 +308,29 @@ class ConfigWindow:
     def _update_status(self, text: str, color: str):
         if self._root:
             self._root.after(0, lambda: self._status_label.config(text=text, foreground=color))
+
+    # ------------------------------------------------------------------ #
+    #  状态栏右键复制
+    # ------------------------------------------------------------------ #
+    def _show_status_menu(self, event):
+        """右键弹出菜单，允许复制状态栏文字"""
+        text = self._status_label.cget("text")
+        if not text:
+            return
+        menu = tk.Menu(self._root, tearoff=0)
+        menu.add_command(label="复制", command=self._copy_status_to_clipboard)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.destroy()
+
+    def _copy_status_to_clipboard(self):
+        """将状态栏当前文字写入系统剪贴板"""
+        if self._root:
+            text = self._status_label.cget("text")
+            self._root.clipboard_clear()
+            self._root.clipboard_append(text)
+            logger.debug(f"Copied to clipboard: {text}")
 
     # ------------------------------------------------------------------ #
     #  关闭

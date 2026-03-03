@@ -1099,6 +1099,7 @@
 import {ref, onMounted, onUnmounted, watch, computed} from 'vue'
 import axios from 'axios'
 import {useToast} from '@/composables/useToast'
+import {useWebSocket} from '@/composables/useWebSocket'
 import {useConfigStore} from '@/stores/config'
 import {useUserPreferencesStore} from '@/stores/userPreferences'
 import {useDraggableCards} from '@/composables/useDraggableCards'
@@ -1106,6 +1107,16 @@ import type {Config, NotifyChannel, NotifyPlugin, ConfigField, PreShutdownHook, 
 
 const toast = useToast()
 const configStore = useConfigStore()
+const { configChanged } = useWebSocket()
+
+// 监听配置变更（如 Agent 自动注册 hook），自动重新加载配置
+watch(configChanged, async (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal > oldVal) {
+    console.log('[Settings] Config changed via WebSocket, reloading...')
+    await loadConfig()
+    toast.success('配置已更新（来自服务端）')
+  }
+})
 
 // 用户偏好设置
 const userPrefs = useUserPreferencesStore()

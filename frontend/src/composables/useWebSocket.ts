@@ -12,6 +12,7 @@ const error = ref<string | null>(null)
 const latestHookProgress = ref<any>(null)  // 最新的 Hook 执行进度更新
 const connectionEvent = ref<{ type: string; message: string; timestamp: number } | null>(null)  // NUT 连接状态事件
 const lastReceivedAt = ref<number>(0)  // 客户端最后收到数据的时间戳（用于判断数据是否过时）
+const configChanged = ref<number>(0)  // 配置变更计数器，每次变更 +1，触发监听者重新加载
 
 let ws: WebSocket | null = null
 let reconnectTimer: number | null = null
@@ -78,6 +79,10 @@ const connect = () => {
         } else if (message.type === 'heartbeat') {
           // 心跳响应
           console.debug('Heartbeat received')
+        } else if (message.type === 'config_changed') {
+          // 配置变更通知（如 Agent 自动注册 hook）
+          configChanged.value++
+          console.log('[WebSocket] Config changed, notifying listeners')
         }
       } catch (e) {
         console.error('Failed to parse WebSocket message:', e)
@@ -163,6 +168,7 @@ export function useWebSocket() {
     latestHookProgress,
     connectionEvent,
     lastReceivedAt,
+    configChanged,
     connect,
     disconnect
   }

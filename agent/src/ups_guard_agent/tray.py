@@ -91,7 +91,7 @@ class TrayIcon:
                 menu=Menu(
                     MenuItem(lambda text: self._status_label(), None, enabled=False),
                     Menu.SEPARATOR,
-                    MenuItem("⚙ 设置", settings_action),
+                    MenuItem("⚙ 设置", settings_action, default=True),
                     MenuItem("退出", quit_action),
                 ),
             )

@@ -347,30 +347,9 @@ class ConfigWindow:
     # ------------------------------------------------------------------ #
     def _on_window_close(self):
         """关闭窗口时询问用户是退出还是最小化"""
-        # 弹出三选一对话框
-        result = messagebox.askyesnocancel(
-            "关闭设置",
-            "请选择操作：\n\n"
-            "• 点击「是」— 最小化到系统托盘（后台继续运行）\n"
-            "• 点击「否」— 完全退出 Agent\n"
-            "• 点击「取消」— 返回设置窗口",
-        )
-
-        if result is None:
-            # 取消 — 不做任何操作
-            return
-        elif result:
-            # 是 — 最小化到托盘（仅关闭设置窗口）
-            if self._root:
-                self._root.destroy()
-                self._root = None
-            # 不调用 on_close，让 Agent 继续在托盘运行
-        else:
-            # 否 — 完全退出
-            if self._root:
-                self._root.destroy()
-                self._root = None
-            if self._on_close:
-                self._on_close()
+        logger.info("Settings window closed, minimizing to tray")
+        if self._root:
+            self._root.destroy()
+            self._root = None
 
 

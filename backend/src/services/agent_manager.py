@@ -139,6 +139,7 @@ class AgentConnectionManager:
         必须收到 pong 回复才能确认。
         """
         if agent_id not in self._agents:
+            logger.debug(f"Agent {agent_id} not in agents dict, offline")
             return False
 
         # 构造一个唯一的 ping request_id，复用 pending_commands 机制等待回复
@@ -155,10 +156,14 @@ class AgentConnectionManager:
             })
             # 等待 pong 回复，最多 5 秒
             await asyncio.wait_for(future, timeout=5.0)
+            logger.debug(f"Agent {agent_id} online check: OK")
             return True
-        except (asyncio.TimeoutError, Exception) as e:
-            logger.debug(f"Agent {agent_id} online check failed: {e}")
-            # Agent 无响应，清理掉已失效的连接
+        except asyncio.TimeoutError:
+            logger.info(f"Agent {agent_id} online check: pong timeout (5s), cleaning up stale connection")
+            self.unregister(agent_id)
+            return False
+        except Exception as e:
+            logger.info(f"Agent {agent_id} online check failed: {e}, cleaning up")
             self.unregister(agent_id)
             return False
         finally:

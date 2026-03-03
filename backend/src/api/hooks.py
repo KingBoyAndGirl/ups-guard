@@ -41,14 +41,19 @@ async def test_hook(request: HookTestRequest):
         # 创建 hook 实例
         hook_instance = registry.create_instance(request.hook_id, request.config)
         
-        # 测试连接
-        success = await hook_instance.test_connection()
-        
+        # 增加超时保护，防止 stale WebSocket 连接导致长时间挂起
+        success = await asyncio.wait_for(
+            hook_instance.test_connection(),
+            timeout=DEVICE_CONNECTION_TIMEOUT
+        )
+
         if success:
             return {"success": True, "message": "Hook 测试成功"}
         else:
-            return {"success": False, "message": "Hook 测试失败"}
-    
+            return {"success": False, "message": "Hook 测试失败：设备离线或无响应"}
+
+    except asyncio.TimeoutError:
+        return {"success": False, "message": f"Hook 测试超时（{DEVICE_CONNECTION_TIMEOUT}秒无响应）"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

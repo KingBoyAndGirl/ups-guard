@@ -75,14 +75,20 @@ class HookRegistry:
         
         Returns:
             Hook 插件实例
+
+        注意：
+            agent_shutdown 类型的 Hook 即使在 MOCK_MODE 下也使用真实实例，
+            因为 Agent 在线检测依赖真实的 WebSocket ping-pong 机制，
+            mock 会给出误导性的"在线"结果。
         """
-        # In mock mode, return a mock hook instead
-        if self._mock_mode:
+        hook_class = self.get_hook(hook_id)
+
+        # agent_shutdown 始终使用真实实例（即使在 mock 模式下）
+        # 因为它依赖 WebSocket 连接状态，mock 会给出误导性的"在线"结果
+        if self._mock_mode and hook_id != "agent_shutdown":
             from hooks.mock_hook import MockHook
-            hook_class = self.get_hook(hook_id)
             return MockHook(hook_id, hook_class.hook_name, config)
         
-        hook_class = self.get_hook(hook_id)
         return hook_class(config)
 
 

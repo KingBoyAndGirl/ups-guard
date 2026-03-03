@@ -57,18 +57,36 @@ class Settings(BaseSettings):
         case_sensitive = False
     
     def get_or_generate_api_token(self) -> str:
-        """Get API token or generate a random one"""
+        """
+        获取 API Token，优先级：
+        1. 持久化文件（/data/.api_token）—— 支持 Web 修改后跨部署保持
+        2. 环境变量 API_TOKEN
+        3. 自动生成并持久化
+        """
+        # 1. 尝试从持久化文件读取
+        token_from_file = _read_persisted_token()
+        if token_from_file:
+            # 同步到内存，后续不再读文件
+            self.api_token = token_from_file
+            return token_from_file
+
+        # 2. 环境变量中有设置
         if self.api_token:
+            # 将环境变量中的 Token 同步到持久化文件
+            _write_persisted_token(self.api_token)
             return self.api_token
-        
-        # Generate random token
+
+        # 3. 都没有，自动生成
         token = secrets.token_urlsafe(32)
         logger.warning("=" * 80)
         logger.warning("API_TOKEN not set. Generated random token:")
         logger.warning(f"  {token}")
-        logger.warning("Please save this token and set it as API_TOKEN environment variable")
-        logger.warning("All API requests must include: Authorization: Bearer <token>")
+        logger.warning("Token has been persisted to data directory")
         logger.warning("=" * 80)
+
+        # 持久化并更新内存
+        _write_persisted_token(token)
+        self.api_token = token
         return token
 
 
@@ -188,15 +206,70 @@ async def get_config_manager() -> ConfigManager:
     return config_manager
 
 
+# ---------- Token 持久化文件操作 ---------- #
+
+def _get_token_file_path() -> Path:
+    """
+    获取 Token 持久化文件路径。
+    优先使用 /data 目录（懒猫挂载的持久化卷），
+    回退到 DATA_DIR（本地开发环境）。
+    """
+    # 从 DATABASE_PATH 推断 data 目录
+    db_path = os.environ.get("DATABASE_PATH", "")
+    if db_path:
+        data_dir = Path(db_path).parent
+        if data_dir != Path(".") and (data_dir.exists() or data_dir.parent.exists()):
+            return data_dir / ".api_token"
+
+    # 回退到项目 data 目录
+    return DATA_DIR / ".api_token"
+
+
+def _read_persisted_token() -> str | None:
+    """从持久化文件读取 Token，不存在或为空则返回 None"""
+    token_file = _get_token_file_path()
+    if token_file.exists():
+        token = token_file.read_text(encoding="utf-8").strip()
+        if token:
+            logger.debug(f"Loaded API Token from {token_file}")
+            return token
+    return None
+
+
+def _write_persisted_token(token: str) -> None:
+    """将 Token 写入持久化文件"""
+    token_file = _get_token_file_path()
+    token_file.parent.mkdir(parents=True, exist_ok=True)
+    token_file.write_text(token + "\n", encoding="utf-8")
+    # 设置文件权限为仅 owner 可读写（安全）
+    try:
+        token_file.chmod(0o600)
+    except OSError:
+        pass  # Windows 或权限受限环境下忽略
+    logger.info(f"API Token persisted to {token_file}")
+
+
 def persist_api_token(new_token: str) -> None:
     """
-    将 API Token 写入 .env 文件以实现持久化。
+    持久化 API Token（供 Web UI 修改 Token 时调用）。
 
-    如果 .env 中已有 API_TOKEN 行则替换，否则追加。
-
-    Args:
-        new_token: 新的 API Token
+    写入持久化文件 + 同步更新 settings 内存。
+    同时保持 .env 兼容（本地开发环境）。
     """
+    # 1. 写入持久化文件（主要）
+    _write_persisted_token(new_token)
+
+    # 2. 同步更新 settings 实例
+    settings.api_token = new_token
+
+    # 3. 同时写入 .env 文件（兼容本地开发环境）
+    _persist_to_env_file(new_token)
+
+    logger.info("API Token updated and persisted")
+
+
+def _persist_to_env_file(new_token: str) -> None:
+    """将 Token 写入 .env 文件（兼容本地开发环境）"""
     env_path = ENV_FILE
     lines: list[str] = []
 
@@ -212,14 +285,12 @@ def persist_api_token(new_token: str) -> None:
             break
 
     if not found:
-        # 确保前面有换行
         if lines and not lines[-1].endswith("\n"):
             lines[-1] += "\n"
         lines.append(f"API_TOKEN={new_token}\n")
 
-    env_path.write_text("".join(lines), encoding="utf-8")
-
-    # 同步更新 settings 实例
-    settings.api_token = new_token
-    logger.info("API Token persisted to .env")
+    try:
+        env_path.write_text("".join(lines), encoding="utf-8")
+    except OSError as e:
+        logger.debug(f"Failed to write .env file (expected in container): {e}")
 

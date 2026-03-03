@@ -282,23 +282,33 @@ class ConfigWindow:
                 import urllib.request
                 import json
 
-                url = server.rstrip("/") + "/health"
-                req = urllib.request.Request(
-                    url,
+                # 先测试连通性（/health 不需要认证）
+                health_url = server.rstrip("/") + "/health"
+                health_req = urllib.request.Request(health_url, method="GET")
+                with urllib.request.urlopen(health_req, timeout=5) as resp:
+                    health_body = json.loads(resp.read())
+                    version = health_body.get("version", "?")
+
+                # 再验证 Token（/api/config 需要认证）
+                config_url = server.rstrip("/") + "/api/config"
+                config_req = urllib.request.Request(
+                    config_url,
                     headers={"Authorization": f"Bearer {token}"},
                     method="GET",
                 )
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    body = json.loads(resp.read())
-                    version = body.get("version", "?")
-                    self._update_status(f"✅ 连接成功 (v{version})", "green")
+                with urllib.request.urlopen(config_req, timeout=5) as resp:
+                    pass  # 200 = Token 正确
+
+                self._update_status(f"✅ 连接成功，Token 验证通过 (v{version})", "green")
             except Exception as e:
                 err_msg = str(e)
                 # 简化常见错误信息
                 if "urlopen error" in err_msg:
                     err_msg = "无法连接到服务器，请检查地址和网络"
                 elif "HTTP Error 401" in err_msg or "HTTP Error 403" in err_msg:
-                    err_msg = "认证失败，请检查 API Token"
+                    err_msg = "Token 验证失败，请检查 API Token 是否正确"
+                elif "HTTP Error" in err_msg:
+                    err_msg = f"服务器错误: {err_msg}"
                 self._update_status(f"❌ {err_msg}", "red")
             finally:
                 self._testing = False

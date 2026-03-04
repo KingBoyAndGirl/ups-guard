@@ -42,6 +42,10 @@ class NutClientInterface(Protocol):
         """列出所有可写变量及其元数据"""
         ...
 
+    async def list_commands(self) -> list:
+        """列出 UPS 支持的即时命令 (LIST CMD)"""
+        ...
+
 
 class RealNutClient:
     """真实的 NUT 客户端实现"""
@@ -459,6 +463,33 @@ class RealNutClient:
             logger.error(f"Error listing RW variables: {e}")
             return {}
 
+    async def list_commands(self) -> list:
+        """列出 UPS 支持的即时命令
+        
+        NUT 协议: LIST CMD <upsname>
+        响应格式:
+        BEGIN LIST CMD <upsname>
+        CMD <upsname> <cmdname>
+        END LIST CMD <upsname>
+        """
+        try:
+            await self._send_command(f"LIST CMD {self.ups_name}")
+            lines = await self._read_until("END LIST CMD")
+
+            commands = []
+            for line in lines:
+                # 响应格式: CMD <upsname> <cmdname>
+                if line.startswith("CMD"):
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        commands.append(parts[2])
+
+            logger.info(f"UPS supports {len(commands)} instant commands: {commands}")
+            return commands
+        except Exception as e:
+            logger.error(f"Error listing UPS commands: {e}")
+            return []
+
 
 class EventDrivenNutClient(RealNutClient):
     """
@@ -734,6 +765,19 @@ class MockNutClient:
             name: {"value": val, "writable": True}
             for name, val in self._mock_rw_vars.items()
         }
+
+    async def list_commands(self) -> list:
+        """列出 UPS 支持的即时命令（模拟）"""
+        await asyncio.sleep(0.05)
+        return [
+            "test.battery.start.quick",
+            "test.battery.start.deep",
+            "test.battery.stop",
+            "beeper.enable",
+            "beeper.disable",
+            "beeper.mute",
+            "beeper.toggle",
+        ]
     
     # Mock 测试辅助方法
     def set_power_lost(self):

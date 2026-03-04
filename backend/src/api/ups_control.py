@@ -19,6 +19,7 @@ ALLOWED_COMMANDS = {
     "beeper.mute": "临时静音蜂鸣器",
     "beeper.on": "蜂鸣器响起（测试）",
     "beeper.off": "蜂鸣器停止",
+    "beeper.toggle": "切换蜂鸣器状态",
     "test.battery.start.quick": "快速电池测试",
     "test.battery.start.deep": "深度电池测试",
     "test.battery.stop": "停止电池测试",
@@ -49,6 +50,39 @@ async def list_available_commands():
             for cmd, desc in ALLOWED_COMMANDS.items()
         ]
     }
+
+
+@router.get("/ups/supported-commands")
+async def get_supported_commands():
+    """获取 UPS 实际支持的即时命令列表（通过 NUT LIST CMD 查询）"""
+    monitor = get_monitor()
+    if not monitor:
+        raise HTTPException(status_code=503, detail="监控服务未初始化")
+
+    nut_client = monitor.nut_client
+    if not hasattr(nut_client, 'list_commands'):
+        return {"supported_commands": [], "capabilities": {}}
+
+    try:
+        commands = await nut_client.list_commands()
+        capabilities = {
+            "quick_test": "test.battery.start.quick" in commands,
+            "deep_test": "test.battery.start.deep" in commands,
+            "test_stop": "test.battery.stop" in commands,
+            "beeper_toggle": "beeper.toggle" in commands,
+            "beeper_enable": "beeper.enable" in commands,
+            "beeper_disable": "beeper.disable" in commands,
+            "beeper_mute": "beeper.mute" in commands,
+        }
+        logger.info(f"UPS capabilities: {capabilities}")
+        return {
+            "supported_commands": commands,
+            "capabilities": capabilities,
+        }
+    except Exception as e:
+        logger.error(f"Error getting supported commands: {e}")
+        return {"supported_commands": [], "capabilities": {}}
+
 
 @router.post("/ups/command", response_model=CommandResponse)
 async def execute_ups_command(request: CommandRequest):
@@ -95,18 +129,39 @@ async def execute_ups_command(request: CommandRequest):
 async def control_beeper(action: str):
     """蜂鸣器控制便捷端点
     
-    action: enable | disable | mute
+    action: enable | disable | mute | toggle
+    自动适配：若 UPS 只支持 toggle，enable/disable 会自动转为 toggle
     """
     command_map = {
         "enable": "beeper.enable",
         "disable": "beeper.disable",
         "mute": "beeper.mute",
+        "toggle": "beeper.toggle",
     }
     
     if action not in command_map:
-        raise HTTPException(status_code=400, detail=f"无效操作: {action}。可用: enable, disable, mute")
-    
-    return await execute_ups_command(CommandRequest(command=command_map[action]))
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效操作: {action}。可用: enable, disable, mute, toggle"
+        )
+
+    target_command = command_map[action]
+
+    # 自动适配：如果 UPS 不支持 enable/disable 但支持 toggle
+    monitor = get_monitor()
+    if monitor and hasattr(monitor.nut_client, 'list_commands'):
+        try:
+            supported = await monitor.nut_client.list_commands()
+            if target_command not in supported and "beeper.toggle" in supported:
+                logger.info(
+                    f"UPS doesn't support '{target_command}', "
+                    f"falling back to 'beeper.toggle'"
+                )
+                target_command = "beeper.toggle"
+        except Exception as e:
+            logger.warning(f"Failed to check supported commands: {e}")
+
+    return await execute_ups_command(CommandRequest(command=target_command))
 
 
 def _safe_float(value) -> Optional[float]:
@@ -145,6 +200,7 @@ async def monitor_test_completion(report_service, monitor, test_type: str):
 
     start_time = datetime.now()
     sample_count = 0
+    saw_cal = False  # 新增：是否曾经看到 CAL 状态
 
     logger.info(f"[BatteryTest] Starting monitoring for {test_type} test, interval={interval}s, timeout={timeout}s, min_wait={min_wait}s")
 
@@ -181,25 +237,29 @@ async def monitor_test_completion(report_service, monitor, test_type: str):
             # 获取测试结果
             test_result = all_vars.get('ups.test.result', '')
             ups_status = all_vars.get('ups.status', '')
+            has_test_result_var = bool(test_result)  # UPS 是否提供此变量
 
             # 检查是否正在测试（状态包含 CAL = 校准/测试）
             is_testing = 'CAL' in ups_status or 'progress' in test_result.lower()
+
+            # 记录是否曾经看到 CAL 状态
+            if is_testing:
+                saw_cal = True
+                logger.info(f"[BatteryTest] UPS in testing state: {ups_status}")
 
             # 完成条件：
             # 1. 已过最小等待时间
             # 2. UPS 不在测试状态（没有 CAL 标志）
             # 3. 测试结果不是 "in progress"
             if elapsed >= min_wait and not is_testing:
-                # 确定结果状态
-                result_status = 'unknown'
-                if 'passed' in test_result.lower():
-                    result_status = 'passed'
-                elif 'warning' in test_result.lower():
-                    result_status = 'warning'
-                elif 'error' in test_result.lower() or 'failed' in test_result.lower():
-                    result_status = 'failed'
-
-                logger.info(f"[BatteryTest] Test completed: {result_status} - {test_result}")
+                # 使用新的判定逻辑
+                result_status = _determine_test_result(
+                    test_result, has_test_result_var, saw_cal, ups_data
+                )
+                logger.info(
+                    f"[BatteryTest] Test completed: {result_status} "
+                    f"(test_result='{test_result}', saw_cal={saw_cal})"
+                )
                 await report_service.complete_test(result_status, test_result, ups_data)
                 break
 
@@ -209,6 +269,9 @@ async def monitor_test_completion(report_service, monitor, test_type: str):
                 result_status = 'unknown'
                 if 'passed' in test_result.lower():
                     result_status = 'passed'
+                elif saw_cal:
+                    # 曾进入测试但超时，可能是 UPS 异常
+                    result_status = 'warning'
                 await report_service.complete_test(result_status, test_result or 'Timeout', ups_data)
                 break
 
@@ -219,6 +282,48 @@ async def monitor_test_completion(report_service, monitor, test_type: str):
             # 继续监控，不要因为一次错误就停止
 
     logger.info(f"[BatteryTest] Monitoring ended, {sample_count} samples collected")
+
+
+def _determine_test_result(
+    test_result: str,
+    has_test_result_var: bool,
+    saw_cal: bool,
+    ups_data: dict,
+) -> str:
+    """判定电池测试结果
+
+    策略：
+    1. 如果 UPS 提供 ups.test.result → 优先使用
+    2. 如果 UPS 不提供 → 通过 CAL 状态变化 + 电池电量推断
+    """
+    # 策略 1：UPS 提供 ups.test.result
+    if has_test_result_var:
+        result_lower = test_result.lower()
+        if 'passed' in result_lower or 'done and target' in result_lower:
+            return 'passed'
+        elif 'warning' in result_lower:
+            return 'warning'
+        elif 'error' in result_lower or 'failed' in result_lower:
+            return 'failed'
+        return 'unknown'
+
+    # 策略 2：UPS 不提供 ups.test.result（如 nutdrv_qx + Voltronic-QS）
+    # 通过 CAL 状态变化来推断
+    if saw_cal:
+        # 曾经进入 CAL 状态后正常退出 → 测试完成
+        charge = ups_data.get('battery_charge')
+        if charge is not None and charge >= 90:
+            # 快速测试后电量仍然很高 → 电池健康
+            return 'passed'
+        elif charge is not None and charge < 50:
+            # 测试后电量很低 → 可能有问题
+            return 'warning'
+        else:
+            # 默认认为完成即通过（大多数快速测试场景）
+            return 'passed'
+
+    # 没有看到 CAL 状态，也没有 test_result → 未知
+    return 'unknown'
 
 
 @router.post("/ups/test-battery/{test_type}")

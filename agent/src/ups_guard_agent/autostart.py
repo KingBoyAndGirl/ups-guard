@@ -116,15 +116,21 @@ def _install_service_elevated(agent_name: str) -> None:
     bin_path = _get_service_bin_path()
     rc, _ = _run_sc("qc", _WIN_SERVICE_NAME)
     if rc != 0:
-        # Service does not exist — create it
+        # Service does not exist — create it.
+        # The entire binPath value (exe + args) must be wrapped in outer double-quotes so
+        # cmd.exe passes it as a single token to sc.exe.  Any inner quotes (added by
+        # _get_service_bin_path for paths that contain spaces) are escaped with backslash
+        # so that CommandLineToArgvW / sc.exe interpret them correctly.
+        bin_path_sc = '"' + bin_path.replace('"', r'\"') + '"'
         rc, out = _run_sc(
             "create", _WIN_SERVICE_NAME,
-            f"binPath= {bin_path}",
+            f"binPath= {bin_path_sc}",
             f'DisplayName= "{agent_name}"',
             "start= auto",
             "obj= LocalSystem",
         )
         if rc != 0:
+            logger.error(f"sc.exe create failed (rc={rc}): {out.strip()}")
             raise RuntimeError(f"sc.exe create failed (rc={rc}): {out.strip()}")
         logger.info(f"Windows service '{_WIN_SERVICE_NAME}' created")
     else:

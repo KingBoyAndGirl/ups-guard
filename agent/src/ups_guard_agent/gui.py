@@ -253,14 +253,10 @@ class ConfigWindow:
         srv_info_row = ttk.Frame(shutdown_frame)
         srv_info_row.pack(fill="x", pady=(2, 0))
         self._srv_info_label = tk.Label(
-            srv_info_row, text='（点击"从服务端刷新"获取最新配置）',
+            srv_info_row, text="（每 60 秒自动从服务端同步）",
             font=("", 8), foreground="grey",
         )
         self._srv_info_label.pack(side="left")
-        ttk.Button(
-            srv_info_row, text="从服务端刷新",
-            command=self._refresh_server_shutdown_config,
-        ).pack(side="right")
 
         # --- 开机自启复选框 ---
         self._autostart_var = tk.BooleanVar(value=is_autostart_enabled())
@@ -281,6 +277,7 @@ class ConfigWindow:
                         self._status_label.config(text="✅ 已设置开机自启", foreground="green")
                     logger.info("Autostart enabled via GUI")
                 except Exception as e:
+                    logger.error(f"Failed to install autostart: {e}", exc_info=True)
                     self._status_label.config(text=f"❌ 设置失败: {e}", foreground="red")
                     self._autostart_var.set(False)
             else:
@@ -292,6 +289,7 @@ class ConfigWindow:
                         self._status_label.config(text="✅ 已取消开机自启", foreground="green")
                     logger.info("Autostart disabled via GUI")
                 except Exception as e:
+                    logger.error(f"Failed to remove autostart: {e}", exc_info=True)
                     self._status_label.config(text=f"❌ 取消失败: {e}", foreground="red")
                     self._autostart_var.set(True)
 

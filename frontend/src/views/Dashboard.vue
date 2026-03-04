@@ -2605,14 +2605,15 @@ const executeUpsCommand = async (command: string, successMsg: string) => {
 const toggleBeeper = async () => {
   const current = upsData.value?.ups_beeper_status
   const targetStatus = current === 'enabled' ? 'disabled' : 'enabled'
-  const command = current === 'enabled' ? 'beeper.disable' : 'beeper.enable'
+  const action = current === 'enabled' ? 'disable' : 'enable'
   const successMsg = current === 'enabled' ? '蜂鸣器已禁用' : '蜂鸣器已启用'
   
   if (beeperToggleLoading.value) return
   beeperToggleLoading.value = true
   
   try {
-    const response = await axios.post('/api/ups/command', { command })
+    // 使用便捷端点，后端会自动回退到 beeper.toggle（如果 UPS 不支持 enable/disable）
+    const response = await axios.post(`/api/ups/beeper/${action}`)
     if (response.data.success) {
       toast.success(successMsg)
       
@@ -2640,7 +2641,8 @@ const muteBeeper = async () => {
   beeperMuteLoading.value = true
   
   try {
-    const response = await axios.post('/api/ups/command', { command: 'beeper.mute' })
+    // 使用便捷端点，后端会自动回退到 beeper.toggle（如果 UPS 不支持 mute）
+    const response = await axios.post('/api/ups/beeper/mute')
     if (response.data.success) {
       toast.success('蜂鸣器已临时静音')
     } else {

@@ -55,6 +55,7 @@ services:
     image: registry.lazycat.cloud/wtj_0527/wtjking/ups-guard:0d3062047a286b2f
     binds:
       - /lzcapp/var/data:/data
+      - /lzcapp/run/sys/lzc-apis.socket:/lzcapp/run/sys/lzc-apis.socket:ro  # gRPC socket 只读挂载
     environment:
       - DATABASE_PATH=/data/ups_guard.db
       - LOG_LEVEL=INFO
@@ -65,5 +66,6 @@ services:
       - NUT_PASSWORD=secret
       - UPS_DRIVER=usbhid-ups
       - UPS_PORT=auto
-      - DISABLE_SHUTDOWN=true
+      - DISABLE_SHUTDOWN=false
+      - LZC_GRPC_SOCKET=/lzcapp/run/sys/lzc-apis.socket  # gRPC socket 路径
       # API_TOKEN 不再硬编码，首次启动自动生成并持久化到 /data/.api_token

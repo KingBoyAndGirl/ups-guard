@@ -334,6 +334,9 @@ class ConfigWindow:
         # 关闭窗口
         root.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
+        # 窗口打开后自动从服务端拉取关机配置（延迟 600 ms 等渲染完成）
+        root.after(600, self._refresh_server_shutdown_config)
+
         root.mainloop()
 
     # ------------------------------------------------------------------ #

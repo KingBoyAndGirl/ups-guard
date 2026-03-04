@@ -174,6 +174,15 @@ async def _auto_register_shutdown_hook(
     ]
     next_priority = max(existing_priorities, default=9) + 1
 
+    # 继承用户已经设置的超时时间（取现有 agent_shutdown 钩子的超时时间），
+    # 若无则使用默认值 300s（≈4 分钟预关机命令 + 60s 关机下发）。
+    existing_agent_hook_timeouts = [
+        h["timeout"]
+        for h in config.pre_shutdown_hooks
+        if h.get("hook_id") == "agent_shutdown" and h.get("timeout") is not None
+    ]
+    default_timeout = max(existing_agent_hook_timeouts) if existing_agent_hook_timeouts else 300
+
     new_hook = {
         "enabled": True,
         "hook_id": "agent_shutdown",
@@ -181,7 +190,7 @@ async def _auto_register_shutdown_hook(
         "priority": next_priority,
         # timeout 需要覆盖：预关机命令总运行时间 + 关机命令下发时间（~60s）。
         # 默认 300s = 约 4 分钟用于预关机命令 + 60s 用于关机命令下发。
-        "timeout": 300,
+        "timeout": default_timeout,
         "on_failure": "continue",
         "auto_registered": True,
         "config": {

@@ -1073,11 +1073,14 @@ async def get_monitoring_stats():
         config_mode = monitor.config.monitoring_mode
     
     # 构建当前模式字符串
-    if event_mode_active:
-        current_mode = "event_driven" if config_mode == "event_driven" else "hybrid (event_driven)"
-    else:
-        current_mode = "polling" if config_mode == "polling" else "hybrid (polling)"
-    
+    # 格式：显示配置的模式 + 括号内显示实际运行状态
+    if config_mode == "polling":
+        current_mode = "轮询模式"
+    elif config_mode == "event_driven":
+        current_mode = "事件驱动" if event_mode_active else "事件驱动 (降级为轮询)"
+    else:  # hybrid
+        current_mode = "混合模式 (事件驱动)" if event_mode_active else "混合模式 (轮询中)"
+
     # 获取最后更新时间
     last_update_time = getattr(monitor, '_last_update_time', None)
     last_update_iso = last_update_time.isoformat() if last_update_time else None

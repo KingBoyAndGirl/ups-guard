@@ -172,7 +172,7 @@ docker logs -f ups-guard-backend
 ### 原因 1：NUT 版本过旧 ⚠️
 
 **症状**：
-- 监控统计显示："hybrid (polling)"
+- 监控统计显示："混合模式 (轮询中)"
 - 事件驱动状态：❌ 未激活
 
 **检查方法**：

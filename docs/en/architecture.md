@@ -131,13 +131,13 @@ Features:
 
 #### LZCOS gRPC Client (`services/lzc_shutdown.py`) (LazyCAT exclusive feature)
 ```python
-LzcGrpcShutdown  # Production environment
-MockShutdown     # Development environment
+LzcApiGatewayShutdown  # Production environment (via API Gateway)
+MockShutdown           # Development environment
 ```
 
 Implementation:
 - Manual protobuf message encoding
-- Unix socket connection
+- API Gateway connection (insecure gRPC)
 - No proto file compilation dependency
 - **Note**: This feature is only for LazyCAT systems
 
@@ -271,8 +271,8 @@ DATABASE_PATH=/data/ups_guard.db
 # Mode
 MOCK_MODE=false
 
-# gRPC
-LZC_GRPC_SOCKET=/lzcapp/run/sys/lzc-apis.socket
+# LazyCAT API Gateway
+LZC_API_GATEWAY_ADDRESS=app.cloud.lazycat.app.ups-guard.lzcapp:81
 ```
 
 ### Database Configuration

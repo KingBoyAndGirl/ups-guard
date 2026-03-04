@@ -475,32 +475,95 @@ async def get_test_report():
         runtime_display = f"{runtime_min}分{runtime_sec % 60}秒" if runtime_sec else "N/A"
         
         # 测试结果解读
+        # 优先从 NUT 变量获取，若为空则回退到数据库最新报告
         test_result = all_vars.get('ups.test.result', '')
         test_status = 'unknown'
         test_icon = '❓'
-        if 'passed' in test_result.lower():
-            test_status = 'passed'
-            test_icon = '✅'
-        elif 'warning' in test_result.lower():
-            test_status = 'warning'
-            test_icon = '⚠️'
-        elif 'error' in test_result.lower() or 'failed' in test_result.lower():
-            test_status = 'failed'
-            test_icon = '❌'
-        elif 'progress' in test_result.lower():
-            test_status = 'in_progress'
-            test_icon = '🔄'
-        elif test_result == '' or 'no test' in test_result.lower():
-            test_status = 'not_tested'
-            test_icon = '➖'
-        
+
+        if test_result:
+            # NUT 变量有值，按原逻辑解读
+            if 'passed' in test_result.lower():
+                test_status = 'passed'
+                test_icon = '✅'
+            elif 'warning' in test_result.lower():
+                test_status = 'warning'
+                test_icon = '⚠️'
+            elif 'error' in test_result.lower() or 'failed' in test_result.lower():
+                test_status = 'failed'
+                test_icon = '❌'
+            elif 'progress' in test_result.lower():
+                test_status = 'in_progress'
+                test_icon = '🔄'
+            elif 'no test' in test_result.lower():
+                test_status = 'not_tested'
+                test_icon = '➖'
+        else:
+            # NUT 变量为空（如 CyberPower），从数据库最新报告回退
+            try:
+                from services.battery_test_report import get_battery_test_report_service
+                report_service = await get_battery_test_report_service()
+                latest_report = await report_service.get_latest_report()
+                if latest_report:
+                    db_result = latest_report.get('result')
+                    
+                    if db_result == 'in_progress':
+                        # 测试正在进行中 → 显示"测试中"
+                        test_status = 'in_progress'
+                        test_icon = '🔄'
+                        test_result = '报告生成中'
+                    elif db_result is not None:
+                        result_map = {
+                            'passed': ('passed', '✅', '测试通过'),
+                            'failed': ('failed', '❌', '测试失败'),
+                            'warning': ('warning', '⚠️', '测试警告'),
+                            'cancelled': ('not_tested', '➖', '测试已取消'),
+                        }
+                        if db_result in result_map:
+                            test_status, test_icon, test_result = result_map[db_result]
+                        else:
+                            test_result = latest_report.get('result_text', '未测试')
+                            test_status = 'unknown'
+                            test_icon = '❓'
+                        logger.debug(
+                            f"NUT ups.test.result empty, using DB report #{latest_report['id']}: {db_result}"
+                        )
+                    else:
+                        test_status = 'not_tested'
+                        test_icon = '➖'
+                        test_result = '未测试'
+                else:
+                    test_status = 'not_tested'
+                    test_icon = '➖'
+                    test_result = '未测试'
+            except Exception as e:
+                logger.warning(f"Failed to get latest test report from DB: {e}")
+                test_status = 'not_tested'
+                test_icon = '➖'
+                test_result = '未测试'
+
         report = {
             'generated_at': datetime.now().isoformat(),
             'ups_info': {
-                'manufacturer': all_vars.get('ups.mfr', 'N/A'),
-                'model': all_vars.get('ups.model', 'N/A'),
-                'serial': all_vars.get('ups.serial', 'N/A'),
-                'firmware': all_vars.get('ups.firmware', 'N/A'),
+                'manufacturer': (
+                    all_vars.get('ups.mfr')
+                    or all_vars.get('device.mfr')
+                    or 'N/A'
+                ),
+                'model': (
+                    all_vars.get('ups.model')
+                    or all_vars.get('device.model')
+                    or 'N/A'
+                ),
+                'serial': (
+                    all_vars.get('ups.serial')
+                    or all_vars.get('device.serial')
+                    or 'N/A'
+                ),
+                'firmware': (
+                    all_vars.get('ups.firmware')
+                    or all_vars.get('ups.firmware.aux')
+                    or 'N/A'
+                ),
                 'nominal_power': all_vars.get('ups.realpower.nominal', 'N/A'),
             },
             'current_status': {

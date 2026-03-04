@@ -2,7 +2,6 @@
 import grpc
 import logging
 import asyncio
-import socket
 import os
 import platform
 import shutil
@@ -14,165 +13,178 @@ logger = logging.getLogger(__name__)
 
 class ShutdownInterface(Protocol):
     """关机接口"""
-    
+
     async def shutdown(self) -> bool:
         """执行关机"""
         ...
-    
+
     async def reboot(self) -> bool:
         """执行重启"""
         ...
 
 
-class LzcGrpcShutdown:
-    """LZCOS gRPC 关机实现"""
-    
-    def __init__(self, socket_path: str, timeout: float = 5.0, max_retries: int = 3):
-        self.socket_path = socket_path
+class LzcApiGatewayShutdown:
+    """
+    通过懒猫 lzcinit sidecar 的 API Gateway 执行 gRPC 关机。
+
+    懒猫微服架构：
+      ups-guard 容器 --> API Gateway (lzcinit sidecar :81) --> lzc-apis.socket (mTLS)
+    应用容器通过 insecure gRPC 连接 API Gateway，由 sidecar 代理 mTLS 认证。
+
+    Gateway 地址格式: app.<LAZYCAT_APP_ID>.lzcapp:81
+    """
+
+    def __init__(
+        self,
+        gateway_address: str = "",
+        timeout: float = 10.0,
+        max_retries: int = 3,
+    ):
+        self.gateway_address = gateway_address or self._detect_gateway_address()
         self.timeout = timeout
         self.max_retries = max_retries
-    
-    async def _check_socket_reachable(self) -> bool:
-        """检查 socket 是否可达"""
-        try:
-            # Check if socket file exists
-            if not os.path.exists(self.socket_path):
-                logger.error(f"Socket file does not exist: {self.socket_path}")
-                return False
-            
-            # Try to connect to the socket
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(1.0)
-            try:
-                sock.connect(self.socket_path)
-                sock.close()
-                return True
-            except Exception as e:
-                logger.error(f"Socket connection test failed: {e}")
-                return False
-        except Exception as e:
-            logger.error(f"Error checking socket reachability: {e}")
-            return False
-    
-    async def _execute_grpc_call(self, request: bytes, operation: str) -> bool:
-        """执行 gRPC 调用（带重试和超时）"""
-        for attempt in range(1, self.max_retries + 1):
-            try:
+        logger.info(f"LzcApiGatewayShutdown initialized, gateway={self.gateway_address}")
 
-                # Check socket reachability first
-                if not await self._check_socket_reachable():
-                    logger.error(f"Socket {self.socket_path} is not reachable")
-                    if attempt < self.max_retries:
-                        # Exponential backoff
-                        wait_time = 2 ** (attempt - 1)
-                        await asyncio.sleep(wait_time)
-                        continue
-                    else:
-                        return False
-                
-                # Create Unix socket connection with timeout
-                channel = grpc.aio.insecure_channel(
-                    f'unix://{self.socket_path}',
-                    options=[
-                        ('grpc.keepalive_timeout_ms', int(self.timeout * 1000)),
-                    ]
+    @staticmethod
+    def _detect_gateway_address() -> str:
+        """
+        自动检测 API Gateway 地址。
+
+        优先级：
+        1. LZCAPP_API_GATEWAY_ADDRESS 环境变量（懒猫平台注入到 app sidecar）
+        2. 根据 LAZYCAT_APP_ID 构造
+        3. 默认值
+        """
+        gateway = os.environ.get("LZCAPP_API_GATEWAY_ADDRESS", "")
+        if gateway:
+            logger.info(f"Using API Gateway from LZCAPP_API_GATEWAY_ADDRESS: {gateway}")
+            return gateway
+
+        app_id = os.environ.get("LAZYCAT_APP_ID", "")
+        if app_id:
+            gateway = f"app.{app_id}.lzcapp:81"
+            logger.info(f"Constructed API Gateway from LAZYCAT_APP_ID: {gateway}")
+            return gateway
+
+        default = "app.cloud.lazycat.app.ups-guard.lzcapp:81"
+        logger.warning(
+            f"No LZCAPP_API_GATEWAY_ADDRESS or LAZYCAT_APP_ID found, "
+            f"using default: {default}"
+        )
+        return default
+
+    async def _execute_grpc_call(self, request: bytes, operation: str) -> bool:
+        """执行 gRPC 调用（带重试和指数退避）"""
+        for attempt in range(1, self.max_retries + 1):
+            channel: grpc.aio.Channel | None = None
+            try:
+                channel = grpc.aio.insecure_channel(self.gateway_address)
+
+                stub = channel.unary_unary(
+                    "/cloud.lazycat.apis.common.BoxService/Shutdown",
+                    request_serializer=lambda x: x,
+                    response_deserializer=lambda x: x,
                 )
-                
-                try:
-                    # Call gRPC method with timeout
-                    stub = channel.unary_unary(
-                        '/cloud.lazycat.apis.common.BoxService/Shutdown',
-                        request_serializer=lambda x: x,
-                        response_deserializer=lambda x: x,
-                    )
-                    
-                    await asyncio.wait_for(stub(request), timeout=self.timeout)
-                    return True
-                finally:
-                    await channel.close()
-                    
+
+                await asyncio.wait_for(stub(request), timeout=self.timeout)
+                logger.info(f"{operation} via API Gateway succeeded")
+                return True
+
             except asyncio.TimeoutError:
-                logger.error(f"{operation} gRPC call timed out after {self.timeout} seconds (attempt {attempt})")
+                logger.error(
+                    f"{operation} gRPC call timed out after {self.timeout}s "
+                    f"(attempt {attempt}/{self.max_retries})"
+                )
             except grpc.RpcError as e:
-                logger.error(f"{operation} gRPC call failed: {e.code()} - {e.details()} (attempt {attempt})")
+                code = e.code()
+                details = e.details()
+                logger.error(
+                    f"{operation} gRPC error: {code} - {details} "
+                    f"(attempt {attempt}/{self.max_retries})"
+                )
+                # UNIMPLEMENTED 说明连接成功但方法不存在，不需要重试
+                if code == grpc.StatusCode.UNIMPLEMENTED:
+                    logger.error(f"{operation}: BoxService/Shutdown not found on gateway")
+                    return False
             except Exception as e:
-                logger.error(f"{operation} failed with unexpected error: {type(e).__name__}: {e} (attempt {attempt})")
-            
-            # Retry with exponential backoff
+                logger.error(
+                    f"{operation} unexpected error: {type(e).__name__}: {e} "
+                    f"(attempt {attempt}/{self.max_retries})"
+                )
+            finally:
+                if channel is not None:
+                    await channel.close()
+
             if attempt < self.max_retries:
                 wait_time = 2 ** (attempt - 1)
+                logger.info(f"Retrying {operation} in {wait_time}s...")
                 await asyncio.sleep(wait_time)
-        
+
         logger.error(f"{operation} failed after {self.max_retries} attempts")
         return False
-    
+
     async def shutdown(self) -> bool:
-        """通过 gRPC 执行关机"""
-        # 手动编码 protobuf ShutdownRequest { Action action = 1; }
-        # Action: POWER_OFF = 0, REBOOT = 1
-        # Wire format: field_number=1, wire_type=0 (varint), value=0
-        # Tag = (field_number << 3) | wire_type = (1 << 3) | 0 = 0x08
-        shutdown_request = bytes([0x08, 0x00])  # Field 1, value 0 (POWER_OFF)
+        """通过 API Gateway 执行关机（graceful shutdown）"""
+        # protobuf ShutdownRequest { Action action = 1; }
+        # Action: POWER_OFF = 0
+        # Tag = (1 << 3) | 0 = 0x08, Value = 0x00
+        shutdown_request = bytes([0x08, 0x00])
         return await self._execute_grpc_call(shutdown_request, "Shutdown")
-    
+
     async def reboot(self) -> bool:
-        """通过 gRPC 执行重启"""
-        # Protobuf: Action = 1 (REBOOT)
-        reboot_request = bytes([0x08, 0x01])  # Field 1, value 1 (REBOOT)
+        """通过 API Gateway 执行重启"""
+        # Action: REBOOT = 1
+        reboot_request = bytes([0x08, 0x01])
         return await self._execute_grpc_call(reboot_request, "Reboot")
 
 
 class MockShutdown:
     """Mock 关机实现，用于开发测试"""
-    
-    def __init__(self, socket_path: str = None):
+
+    def __init__(self):
         pass
-    
+
     async def shutdown(self) -> bool:
         """模拟关机"""
         logger.warning("MOCK MODE: Shutdown command received (not executed)")
-        logger.warning("In production, this would shut down the system via gRPC")
         return True
-    
+
     async def reboot(self) -> bool:
         """模拟重启"""
         logger.warning("MOCK MODE: Reboot command received (not executed)")
-        logger.warning("In production, this would reboot the system via gRPC")
         return True
 
 
 def _is_running_in_docker() -> bool:
     """检测是否运行在 Docker 容器中"""
-    if os.path.exists('/.dockerenv'):
+    if os.path.exists("/.dockerenv"):
         return True
     try:
-        with open('/proc/1/cgroup', 'r') as f:
+        with open("/proc/1/cgroup", "r") as f:
             content = f.read()
-            if 'docker' in content or 'containerd' in content:
+            if "docker" in content or "containerd" in content:
                 return True
     except (FileNotFoundError, PermissionError):
         pass
-    if os.environ.get('DOCKER_CONTAINER') or os.environ.get('container'):
+    if os.environ.get("DOCKER_CONTAINER") or os.environ.get("container"):
         return True
     return False
 
 
 def _find_shutdown_command() -> str | None:
     """查找系统中可用的 shutdown 命令路径"""
-    # 尝试多个常见路径
     candidates = [
-        '/sbin/shutdown',
-        '/usr/sbin/shutdown',
-        '/bin/shutdown',
-        '/usr/bin/shutdown',
+        "/sbin/shutdown",
+        "/usr/sbin/shutdown",
+        "/bin/shutdown",
+        "/usr/bin/shutdown",
     ]
     for path in candidates:
         if os.path.isfile(path) and os.access(path, os.X_OK):
             logger.debug(f"Found shutdown command at: {path}")
             return path
 
-    # 最后尝试 PATH 搜索
-    found = shutil.which('shutdown')
+    found = shutil.which("shutdown")
     if found:
         logger.debug(f"Found shutdown command via PATH: {found}")
     return found
@@ -181,14 +193,14 @@ def _find_shutdown_command() -> str | None:
 def _find_poweroff_command() -> str | None:
     """查找 poweroff/reboot 命令路径"""
     candidates = [
-        '/sbin/poweroff',
-        '/usr/sbin/poweroff',
-        '/bin/poweroff',
+        "/sbin/poweroff",
+        "/usr/sbin/poweroff",
+        "/bin/poweroff",
     ]
     for path in candidates:
         if os.path.isfile(path) and os.access(path, os.X_OK):
             return path
-    return shutil.which('poweroff')
+    return shutil.which("poweroff")
 
 
 class SystemCommandShutdown:
@@ -210,10 +222,7 @@ class SystemCommandShutdown:
             logger.info(f"Detected native {self.os_type} environment")
 
     def _build_shutdown_commands(self) -> list[list[str]]:
-        """
-        构建关机命令候选列表（按优先级排列）。
-        返回多个候选命令，依次尝试直到成功。
-        """
+        """构建关机命令候选列表（按优先级排列）"""
         if self.os_type == "Windows":
             return [["shutdown", "/s", "/t", "0", "/f"]]
 
@@ -223,38 +232,31 @@ class SystemCommandShutdown:
         commands: list[list[str]] = []
 
         if self.in_docker:
-            # 策略 1: nsenter 进入宿主机 PID 1 命名空间执行关机
-            # 需要容器以 --pid=host --privileged 启动
-            nsenter_path = shutil.which('nsenter')
+            nsenter_path = shutil.which("nsenter")
             if nsenter_path:
-                shutdown_in_host = '/sbin/shutdown'  # 宿主机上的路径
                 commands.append([
-                    nsenter_path, '-t', '1', '-m', '-u', '-i', '-n', '-p',
-                    '--', shutdown_in_host, '-h', 'now'
+                    nsenter_path, "-t", "1", "-m", "-u", "-i", "-n", "-p",
+                    "--", "/sbin/shutdown", "-h", "now",
                 ])
                 logger.debug("Strategy 1 (nsenter) available")
 
-            # 策略 2: 容器内直接使用 poweroff -f
             poff = _find_poweroff_command()
             if poff:
-                commands.append([poff, '-f'])
+                commands.append([poff, "-f"])
                 logger.debug(f"Strategy 2 (poweroff) available at {poff}")
 
-            # 策略 3: 容器内直接使用 shutdown（如果容器中安装了）
             shutdown_cmd = _find_shutdown_command()
             if shutdown_cmd:
-                commands.append([shutdown_cmd, '-h', 'now'])
+                commands.append([shutdown_cmd, "-h", "now"])
                 logger.debug(f"Strategy 3 (shutdown in container) available at {shutdown_cmd}")
         else:
-            # 非 Docker：直接使用 shutdown
             shutdown_cmd = _find_shutdown_command()
             if shutdown_cmd:
-                commands.append([shutdown_cmd, '-h', 'now'])
+                commands.append([shutdown_cmd, "-h", "now"])
             else:
-                # 退而求其次用 poweroff
                 poff = _find_poweroff_command()
                 if poff:
-                    commands.append([poff, '-f'])
+                    commands.append([poff, "-f"])
 
         if not commands:
             logger.error(
@@ -276,20 +278,20 @@ class SystemCommandShutdown:
         commands: list[list[str]] = []
 
         if self.in_docker:
-            nsenter_path = shutil.which('nsenter')
+            nsenter_path = shutil.which("nsenter")
             if nsenter_path:
                 commands.append([
-                    nsenter_path, '-t', '1', '-m', '-u', '-i', '-n', '-p',
-                    '--', '/sbin/shutdown', '-r', 'now'
+                    nsenter_path, "-t", "1", "-m", "-u", "-i", "-n", "-p",
+                    "--", "/sbin/shutdown", "-r", "now",
                 ])
 
             shutdown_cmd = _find_shutdown_command()
             if shutdown_cmd:
-                commands.append([shutdown_cmd, '-r', 'now'])
+                commands.append([shutdown_cmd, "-r", "now"])
         else:
             shutdown_cmd = _find_shutdown_command()
             if shutdown_cmd:
-                commands.append([shutdown_cmd, '-r', 'now'])
+                commands.append([shutdown_cmd, "-r", "now"])
 
         return commands
 
@@ -302,7 +304,7 @@ class SystemCommandShutdown:
                 None,
                 lambda: subprocess.run(
                     command, capture_output=True, text=True, timeout=10
-                )
+                ),
             )
 
             if result.returncode == 0:
@@ -366,22 +368,31 @@ class SystemCommandShutdown:
 
 
 def create_shutdown_client(
-    socket_path: str,
     mock_mode: bool = False,
-    shutdown_method: str = "lzc_grpc",
+    shutdown_method: str = "lzc_api_gateway",
+    gateway_address: str = "",
 ) -> ShutdownInterface:
-    """创建关机客户端实例"""
+    """
+    创建关机客户端实例。
+
+    shutdown_method 可选值：
+    - "lzc_api_gateway" : 通过 lzcinit API Gateway 连接（推荐，懒猫微服默认）
+    - "system_command"  : 系统命令关机（Docker/原生通用）
+    - "mock"            : 模拟关机（开发测试）
+    """
     if mock_mode:
         return MockShutdown()
 
-    if shutdown_method == "system_command":
+    if shutdown_method == "lzc_api_gateway":
+        return LzcApiGatewayShutdown(gateway_address=gateway_address)
+    elif shutdown_method == "system_command":
         return SystemCommandShutdown()
-    elif shutdown_method == "lzc_grpc":
-        return LzcGrpcShutdown(socket_path)
     elif shutdown_method == "mock":
         return MockShutdown()
     else:
+        # 兼容旧配置 "lzc_grpc"，fallback 到 API Gateway
         logger.warning(
-            f"Unknown shutdown_method '{shutdown_method}', defaulting to lzc_grpc"
+            f"Unknown shutdown_method '{shutdown_method}', "
+            f"defaulting to lzc_api_gateway"
         )
-        return LzcGrpcShutdown(socket_path)
+        return LzcApiGatewayShutdown(gateway_address=gateway_address)

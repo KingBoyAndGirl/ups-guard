@@ -90,9 +90,9 @@ async def lifespan(app: FastAPI):
     
     # 创建关机客户端
     shutdown_client = create_shutdown_client(
-        settings.lzc_grpc_socket,
-        settings.mock_mode,
-        config.shutdown_method
+        mock_mode=settings.mock_mode,
+        shutdown_method=config.shutdown_method,
+        gateway_address=settings.lzc_api_gateway_address,
     )
     
     # 创建关机管理器

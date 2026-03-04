@@ -131,13 +131,13 @@ ShutdownManager  # 安全关机策略
 
 #### LZCOS gRPC 客户端 (`services/lzc_shutdown.py`)（懒猫微服专有特性）
 ```python
-LzcGrpcShutdown  # 生产环境
-MockShutdown     # 开发环境
+LzcApiGatewayShutdown  # 生产环境（通过 API Gateway）
+MockShutdown           # 开发环境
 ```
 
 实现：
 - 手动编码 protobuf 消息
-- Unix socket 连接
+- 通过 API Gateway 连接（insecure gRPC）
 - 不依赖 proto 文件编译
 - **注意**：此特性仅适用于懒猫微服系统
 
@@ -271,8 +271,8 @@ DATABASE_PATH=/data/ups_guard.db
 # 模式
 MOCK_MODE=false
 
-# gRPC
-LZC_GRPC_SOCKET=/lzcapp/run/sys/lzc-apis.socket
+# 懒猫 API Gateway
+LZC_API_GATEWAY_ADDRESS=app.cloud.lazycat.app.ups-guard.lzcapp:81
 ```
 
 ### 数据库配置

@@ -43,9 +43,9 @@ class Settings(BaseSettings):
     # Mock 模式
     mock_mode: bool = False
     
-    # gRPC socket
-    lzc_grpc_socket: str = "/lzcapp/run/sys/lzc-apis.socket"
-    
+    # 懒猫 API Gateway 地址（留空自动检测）
+    lzc_api_gateway_address: str = ""
+
     # 安全配置
     api_token: str = ""  # API Token for authentication, auto-generated if empty
     encryption_key: str = ""  # Encryption key for sensitive data

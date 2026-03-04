@@ -312,7 +312,7 @@ const formatTime = (isoString: string): string => {
   padding: var(--spacing-md);
   transition: all 0.2s;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   /* 增强背景可见度 */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
 }

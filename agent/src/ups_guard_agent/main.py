@@ -131,6 +131,7 @@ def _is_gui_available() -> bool:
 def _write_status_file(status: str, detail: str, agent_id: str, server_url: str) -> None:
     """Write current connection status to shared status file for tray companion."""
     from ups_guard_agent.config import STATUS_FILE
+    from ups_guard_agent.system_info import get_mac_address
     try:
         data = {
             "status": status,
@@ -139,6 +140,7 @@ def _write_status_file(status: str, detail: str, agent_id: str, server_url: str)
             "pid": os.getpid(),
             "agent_id": agent_id,
             "server_url": server_url,
+            "mac_address": get_mac_address(),
         }
         STATUS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         logger.debug(f"Status file written: {status}")

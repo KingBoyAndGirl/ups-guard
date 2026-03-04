@@ -112,6 +112,12 @@ class AgentClient:
     def stop(self):
         logger.info("Stopping AgentClient")
         self._running = False
+        # 主动关闭 WebSocket 连接，触发 asyncio 循环退出
+        if self._ws is not None and self._loop is not None:
+            try:
+                asyncio.run_coroutine_threadsafe(self._ws.close(), self._loop)
+            except Exception as e:
+                logger.debug(f"Error closing WebSocket: {e}")
 
     async def _connect_and_listen(self):
         """连接并监听消息"""

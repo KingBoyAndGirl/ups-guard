@@ -141,7 +141,7 @@ class ConfigWindow:
         self._set_window_icon(root, None)
 
         # 居中显示 — 加宽窗口
-        win_w, win_h = 580, 540
+        win_w, win_h = 580, 600
         scr_w = root.winfo_screenwidth()
         scr_h = root.winfo_screenheight()
         x = (scr_w - win_w) // 2
@@ -257,6 +257,27 @@ class ConfigWindow:
             font=("", 8), foreground="grey",
         )
         self._srv_info_label.pack(side="left")
+
+        # --- 本机信息（MAC 地址） ---
+        from ups_guard_agent.system_info import get_mac_address
+        local_info_frame = ttk.LabelFrame(root, text="本机信息", padding=(12, 6))
+        local_info_frame.pack(fill="x", padx=20, pady=(8, 2))
+
+        mac_row = ttk.Frame(local_info_frame)
+        mac_row.pack(fill="x", pady=2)
+        ttk.Label(mac_row, text="MAC 地址：", width=16, anchor="e").pack(side="left")
+        mac_address = get_mac_address()
+        self._mac_var = tk.StringVar(value=mac_address)
+        mac_label = ttk.Label(mac_row, textvariable=self._mac_var, foreground="navy")
+        mac_label.pack(side="left")
+
+        # 复制 MAC 地址按钮
+        def _copy_mac():
+            root.clipboard_clear()
+            root.clipboard_append(mac_address)
+            self._status_label.config(text="✅ MAC 地址已复制到剪贴板", foreground="green")
+
+        ttk.Button(mac_row, text="复制", width=6, command=_copy_mac).pack(side="left", padx=(8, 0))
 
         # --- 开机自启复选框 ---
         self._autostart_var = tk.BooleanVar(value=is_autostart_enabled())

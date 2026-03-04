@@ -73,12 +73,48 @@ class TrayIcon:
             import pystray
             from pystray import MenuItem, Menu
 
+            def open_settings():
+                logger.info("Settings action triggered (left click)")
+                if self._on_settings:
+                    self._on_settings()
+
             def quit_action(icon, item):
                 logger.info("Quit action triggered")
-                icon.stop()
+                # 先调用用户回调（如 client.stop()）
                 if self._on_quit:
-                    self._on_quit()
-                # 强制退出整个程序
+                    try:
+                        self._on_quit()
+                    except Exception as e:
+                        logger.warning(f"on_quit callback error: {e}")
+
+                # 停止 Windows 服务（如果存在）
+                try:
+                    import platform
+                    if platform.system() == "Windows":
+                        import subprocess
+                        # 尝试停止服务（不需要管理员权限查询，但停止需要）
+                        # 使用 net stop 更友好，会等待服务停止
+                        result = subprocess.run(
+                            ["net", "stop", "UpsGuardAgent"],
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
+                        )
+                        if result.returncode == 0:
+                            logger.info("Windows service stopped")
+                        else:
+                            # 服务可能未运行，忽略错误
+                            logger.debug(f"Service stop returned: {result.stderr.strip()}")
+                except Exception as e:
+                    logger.debug(f"Error stopping service: {e}")
+
+                # 停止托盘图标
+                try:
+                    icon.stop()
+                except Exception:
+                    pass
+                # 强制退出整个进程（包括所有线程）
+                logger.info("Force exiting process")
                 os._exit(0)
 
             # 使用当前状态创建图标
@@ -87,15 +123,19 @@ class TrayIcon:
                 logger.warning("Cannot create tray icon image")
                 return
 
+            # 创建菜单，第一项设为 default=True 使左键单击触发
+            menu = Menu(
+                MenuItem(lambda text: self._status_label(), None, enabled=False),
+                Menu.SEPARATOR,
+                MenuItem("打开", lambda icon, item: open_settings(), default=True, visible=False),
+                MenuItem("退出", quit_action),
+            )
+
             self._icon = pystray.Icon(
                 "UPS Guard Agent",
                 img,
                 self._status_label(),
-                menu=Menu(
-                    MenuItem(lambda text: self._status_label(), None, enabled=False),
-                    Menu.SEPARATOR,
-                    MenuItem("退出", quit_action),
-                ),
+                menu=menu,
             )
 
             logger.info(f"Tray icon starting, status={self._status}")

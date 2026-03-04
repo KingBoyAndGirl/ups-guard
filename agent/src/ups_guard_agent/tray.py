@@ -81,10 +81,6 @@ class TrayIcon:
                 # 强制退出整个程序
                 os._exit(0)
 
-            def settings_action(icon, item):
-                if self._on_settings:
-                    self._on_settings()
-
             # 使用当前状态创建图标
             img = _make_icon(self._status)
             if img is None:
@@ -98,7 +94,6 @@ class TrayIcon:
                 menu=Menu(
                     MenuItem(lambda text: self._status_label(), None, enabled=False),
                     Menu.SEPARATOR,
-                    MenuItem("⚙ 设置", settings_action, default=True),
                     MenuItem("退出", quit_action),
                 ),
             )

@@ -267,12 +267,59 @@ class ConfigWindow:
             autostart_label = "开机自动启动（需要管理员权限）"
             autostart_hint = "将安装 Windows 服务，开机不登录也可自动运行"
 
+        _AUTOSTART_POLL_TIMEOUT = 30   # seconds to wait for UAC-elevated process
+        _AUTOSTART_POLL_INTERVAL = 1   # polling interval in seconds
+
+        def _poll_win_autostart(expected: bool):
+            """UAC 派发后，在后台轮询自启状态并更新 UI。"""
+            import time
+
+            def _run():
+                deadline = time.monotonic() + _AUTOSTART_POLL_TIMEOUT
+                while time.monotonic() < deadline:
+                    time.sleep(_AUTOSTART_POLL_INTERVAL)
+                    try:
+                        current = is_autostart_enabled()
+                    except Exception:
+                        continue
+                    if current == expected:
+                        msg = "✅ 开机自启已成功安装" if expected else "✅ 开机自启已成功卸载"
+
+                        def _on_success(m=msg):
+                            self._status_label.config(text=m, foreground="green")
+                            self._autostart_var.set(expected)
+
+                        root.after(0, _on_success)
+                        return
+                # 超时 — 同步复选框为实际状态
+                try:
+                    actual = is_autostart_enabled()
+                except Exception:
+                    actual = not expected
+
+                def _on_timeout(a=actual):
+                    self._status_label.config(text="⚠️ 操作超时或已取消，请重试", foreground="orange")
+                    self._autostart_var.set(a)
+
+                root.after(0, _on_timeout)
+
+            threading.Thread(target=_run, daemon=True).start()
+
         def _toggle_autostart():
             if self._autostart_var.get():
                 try:
                     install_autostart()
                     if sys.platform == "win32":
-                        self._status_label.config(text="✅ 正在请求管理员权限安装服务，请在 UAC 弹窗中确认", foreground="green")
+                        if is_autostart_enabled():
+                            # 已提权：服务已同步安装完成
+                            self._status_label.config(text="✅ 开机自启已成功安装", foreground="green")
+                        else:
+                            # 未提权：UAC 弹窗待确认，轮询结果
+                            self._status_label.config(
+                                text="⏳ 正在请求管理员权限，请在 UAC 弹窗中确认…",
+                                foreground="grey",
+                            )
+                            _poll_win_autostart(True)
                     else:
                         self._status_label.config(text="✅ 已设置开机自启", foreground="green")
                     logger.info("Autostart enabled via GUI")
@@ -284,7 +331,16 @@ class ConfigWindow:
                 try:
                     remove_autostart()
                     if sys.platform == "win32":
-                        self._status_label.config(text="✅ 正在请求管理员权限卸载服务，请在 UAC 弹窗中确认", foreground="green")
+                        if not is_autostart_enabled():
+                            # 已提权：服务已同步卸载完成
+                            self._status_label.config(text="✅ 开机自启已成功卸载", foreground="green")
+                        else:
+                            # 未提权：UAC 弹窗待确认，轮询结果
+                            self._status_label.config(
+                                text="⏳ 正在请求管理员权限，请在 UAC 弹窗中确认…",
+                                foreground="grey",
+                            )
+                            _poll_win_autostart(False)
                     else:
                         self._status_label.config(text="✅ 已取消开机自启", foreground="green")
                     logger.info("Autostart disabled via GUI")

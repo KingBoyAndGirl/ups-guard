@@ -271,7 +271,8 @@ class ShutdownManager:
                         default_timeout=120,
                         test_mode=self.test_mode,
                         progress_callback=broadcast_hook_progress,
-                        cancellation_callback=lambda: self._shutdown_cancelled
+                        cancellation_callback=lambda: self._shutdown_cancelled,
+                        urgent=self._skip_reason == "low_runtime"
                     )
                     hook_result = await executor.execute_all()
 
@@ -452,7 +453,8 @@ class ShutdownManager:
                         default_timeout=120,
                         test_mode=self.test_mode,
                         progress_callback=broadcast_hook_progress,
-                        cancellation_callback=lambda: self._shutdown_cancelled
+                        cancellation_callback=lambda: self._shutdown_cancelled,
+                        urgent=False  # 手动触发的立即关机不算紧急
                     )
                     hook_result = await executor.execute_all()
 

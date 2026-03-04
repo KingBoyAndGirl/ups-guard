@@ -26,8 +26,18 @@ class PreShutdownHook(ABC):
             config: 插件配置字典
         """
         self.config = config
+        self._urgent = False  # 是否为紧急关机（续航过短等场景）
         self.validate_config()
     
+    @property
+    def urgent(self) -> bool:
+        """是否为紧急关机模式"""
+        return self._urgent
+
+    @urgent.setter
+    def urgent(self, value: bool):
+        self._urgent = value
+
     @classmethod
     @abstractmethod
     def get_config_schema(cls) -> List[Dict[str, Any]]:

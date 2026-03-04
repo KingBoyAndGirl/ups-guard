@@ -114,8 +114,9 @@ class AgentShutdownHook(PreShutdownHook):
         shutdown_delay = self.config.get("shutdown_delay", 60)
 
         # 先执行预关机命令（逐条），全部执行完后再发关机指令
+        # 紧急关机时跳过预关机命令（没时间了）
         pre_commands_str = self.config.get("pre_commands", "").strip()
-        if pre_commands_str:
+        if pre_commands_str and not self.urgent:
             pre_commands = [cmd.strip() for cmd in pre_commands_str.split("\n") if cmd.strip()]
             logger.info(
                 f"AgentShutdownHook: running {len(pre_commands)} pre_command(s) on agent={agent_id} "
@@ -132,9 +133,33 @@ class AgentShutdownHook(PreShutdownHook):
             logger.info(
                 f"AgentShutdownHook: pre_commands complete, issuing shutdown with delay={shutdown_delay}s"
             )
+        elif self.urgent and pre_commands_str:
+            logger.warning(
+                f"AgentShutdownHook: URGENT shutdown — skipping pre_commands for agent={agent_id}"
+            )
 
-        # 执行关机（关机延迟倒计时从此刻开始）
-        return await self._send_action("shutdown")
+        # 发送关机指令
+        # 紧急时：缩短延迟到 10 秒，force=True 让 Agent 加 /f 强制关闭应用
+        # 正常时：使用配置的延迟，force=False 让 Windows 自己处理
+        params: Dict[str, Any] = {
+            "delay": 10 if self.urgent else shutdown_delay,
+            "message": self.config.get("shutdown_message", ""),
+            "force": self.urgent,
+        }
+
+        if self.urgent:
+            logger.warning(
+                f"AgentShutdownHook: URGENT shutdown agent={agent_id} "
+                f"delay=10s force=True"
+            )
+
+        result = await manager.send_command(agent_id, "shutdown", params)
+        success = result.get("success", False)
+        if not success:
+            logger.error(
+                f"AgentShutdownHook: shutdown agent={agent_id} failed: {result.get('message')}"
+            )
+        return success
 
     async def test_connection(self) -> bool:
         """检测 Agent 是否在线"""

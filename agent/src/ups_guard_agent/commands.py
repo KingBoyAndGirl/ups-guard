@@ -54,10 +54,15 @@ async def _run(cmd: list, operation: str, power_action: bool = False) -> Dict[st
 async def _shutdown(params: Dict[str, Any]) -> Dict[str, Any]:
     delay = int(params.get("delay", 60))
     message = params.get("message", "UPS power lost")
-    logger.info(f"shutdown: delay={delay} message={message!r}")
+    force = params.get("force", False)
+    logger.info(f"shutdown: delay={delay} message={message!r} force={force}")
     sys = platform.system()
     if sys == "Windows":
-        cmd = ["shutdown", "/s", "/t", str(delay), "/f", "/c", message]
+        # 默认不加 /f，让预关机命令优雅关闭应用后由 Windows 正常关机
+        # 仅在 force=True（紧急关机，续航过短）时强制关闭残留应用
+        cmd = ["shutdown", "/s", "/t", str(delay), "/c", message]
+        if force:
+            cmd.insert(4, "/f")
     elif sys == "Darwin":
         cmd = ["sudo", "shutdown", "-h", f"+{delay // 60}"]
     else:

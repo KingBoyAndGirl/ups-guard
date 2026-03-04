@@ -18,7 +18,8 @@ class HookExecutor:
         default_timeout: int = 120,
         test_mode: str = "production",
         progress_callback: Optional[Callable] = None,
-        cancellation_callback: Optional[Callable[[], bool]] = None
+        cancellation_callback: Optional[Callable[[], bool]] = None,
+        urgent: bool = False
     ):
         """
         初始化 Hook 执行器
@@ -31,6 +32,8 @@ class HookExecutor:
                               应接受一个字典参数，包含 'type' 和 'data' 键。
                               示例: {"type": "hook_progress", "data": {...}}
             cancellation_callback: 取消检查回调函数。返回 True 表示需要取消执行。
+            urgent: 是否为紧急关机模式（续航过短等场景），
+                    设置后 hook 可通过 self.urgent 感知并调整行为
         """
         self.registry = get_registry()
         self.hooks_config = hooks_config
@@ -38,7 +41,8 @@ class HookExecutor:
         self.test_mode = test_mode
         self.progress_callback = progress_callback
         self.cancellation_callback = cancellation_callback
-    
+        self.urgent = urgent
+
     async def execute_all(self, hooks_config: Optional[List[dict]] = None) -> dict:
         """
         按优先级编排执行所有 hook：
@@ -301,6 +305,9 @@ class HookExecutor:
                 # 创建 hook 实例
                 hook_instance = self.registry.create_instance(hook_id, config)
                 
+                # 传递紧急关机状态给 hook 实例
+                hook_instance.urgent = self.urgent
+
                 # 如果是 dry_run 模式，只执行 test_connection 而不是实际执行
                 if self.test_mode == "dry_run":
                     success = await asyncio.wait_for(

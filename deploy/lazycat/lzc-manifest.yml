@@ -55,7 +55,7 @@ services:
     image: registry.lazycat.cloud/wtj_0527/wtjking/ups-guard:0d3062047a286b2f
     binds:
       - /lzcapp/var/data:/data
-      - /lzcapp/run/sys/lzc-apis.socket:/lzcapp/run/sys/lzc-apis.socket:ro  # gRPC socket 只读挂载
+      # 系统级 socket 通过 lzc-build.yml 的 compose_override 挂载
     environment:
       - DATABASE_PATH=/data/ups_guard.db
       - LOG_LEVEL=INFO
@@ -67,5 +67,5 @@ services:
       - UPS_DRIVER=usbhid-ups
       - UPS_PORT=auto
       - DISABLE_SHUTDOWN=false
-      - LZC_GRPC_SOCKET=/lzcapp/run/sys/lzc-apis.socket  # gRPC socket 路径
+      - LZC_GRPC_SOCKET=/run/lzc-sys/lzc-apis.socket  # gRPC socket 路径（由 compose_override 挂载）
       # API_TOKEN 不再硬编码，首次启动自动生成并持久化到 /data/.api_token

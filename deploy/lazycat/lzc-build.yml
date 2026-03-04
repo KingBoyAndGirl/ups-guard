@@ -38,3 +38,12 @@ devshell:
     # 安装后端依赖  
     if [ -d "backend" ]; then cd backend && pip install -e . && cd ..; fi
 
+# compose_override - 挂载系统级 socket
+# 懒猫微服的 binds 只允许 /lzcapp 开头的路径，
+# 系统路径（如 gRPC socket）需要通过 compose_override 挂载
+compose_override:
+  services:
+    ups-guard:
+      volumes:
+        - /run/lzc-sys/lzc-apis.socket:/run/lzc-sys/lzc-apis.socket:ro
+

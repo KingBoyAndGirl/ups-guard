@@ -32,6 +32,7 @@ class ConfigWindow:
         self._hidden_root: Optional[tk.Tk] = None
         self._entries: dict = {}
         self._testing = False
+        self._refresh_after_id: Optional[str] = None  # 定时刷新任务 ID
         # 保持图标引用防止被垃圾回收
         self._icon_photo_small = None
         self._icon_photo_medium = None
@@ -334,8 +335,8 @@ class ConfigWindow:
         # 关闭窗口
         root.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
-        # 窗口打开后自动从服务端拉取关机配置（延迟 600 ms 等渲染完成）
-        root.after(600, self._refresh_server_shutdown_config)
+        # 窗口打开后自动从服务端拉取关机配置，之后每 60 秒定期刷新（延迟 600 ms 等渲染完成）
+        root.after(600, self._schedule_periodic_refresh)
 
         root.mainloop()
 
@@ -510,6 +511,10 @@ class ConfigWindow:
 
         logger.info("Settings window closed")
         if self._root:
+            # 取消定时刷新任务，避免窗口销毁后回调触发
+            if self._refresh_after_id is not None:
+                self._root.after_cancel(self._refresh_after_id)
+                self._refresh_after_id = None
             self._root.destroy()
             self._root = None
 
@@ -526,6 +531,15 @@ class ConfigWindow:
     # ------------------------------------------------------------------ #
     #  从服务端刷新关机配置
     # ------------------------------------------------------------------ #
+    def _schedule_periodic_refresh(self):
+        """立即拉取一次服务端配置，然后每隔 60 秒自动重复，保持显示数据与服务端一致"""
+        self._refresh_server_shutdown_config()
+        if self._root:
+            # 先取消旧任务，防止重复调度产生多个并发刷新循环
+            if self._refresh_after_id is not None:
+                self._root.after_cancel(self._refresh_after_id)
+            self._refresh_after_id = self._root.after(60_000, self._schedule_periodic_refresh)
+
     def _refresh_server_shutdown_config(self):
         """后台线程：从服务端 /api/config 拉取关机配置并更新 UI"""
         threading.Thread(target=self._do_refresh_server_config, daemon=True).start()

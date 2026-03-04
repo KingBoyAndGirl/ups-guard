@@ -124,6 +124,26 @@ async def execute_ups_command(request: CommandRequest):
         logger.error(f"Error executing UPS command {command}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# 支持命令缓存（TTL 60秒）
+_supported_commands_cache: list[str] | None = None
+_cache_time: float = 0
+
+
+async def _get_supported_commands_cached(nut_client) -> list[str]:
+    """获取支持的命令列表（带缓存）"""
+    global _supported_commands_cache, _cache_time
+    import time
+    now = time.time()
+    if _supported_commands_cache is not None and (now - _cache_time) < 60:
+        return _supported_commands_cache
+    if hasattr(nut_client, 'list_commands'):
+        _supported_commands_cache = await nut_client.list_commands()
+        _cache_time = now
+        return _supported_commands_cache
+    return []
+
+
 # 便捷端点
 @router.post("/ups/beeper/{action}")
 async def control_beeper(action: str):
@@ -149,9 +169,9 @@ async def control_beeper(action: str):
 
     # 自动适配：如果 UPS 不支持 enable/disable 但支持 toggle
     monitor = get_monitor()
-    if monitor and hasattr(monitor.nut_client, 'list_commands'):
+    if monitor:
         try:
-            supported = await monitor.nut_client.list_commands()
+            supported = await _get_supported_commands_cached(monitor.nut_client)
             if target_command not in supported and "beeper.toggle" in supported:
                 logger.info(
                     f"UPS doesn't support '{target_command}', "

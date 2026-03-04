@@ -42,7 +42,7 @@ class NutClientInterface(Protocol):
         """列出所有可写变量及其元数据"""
         ...
 
-    async def list_commands(self) -> list:
+    async def list_commands(self) -> list[str]:
         """列出 UPS 支持的即时命令 (LIST CMD)"""
         ...
 
@@ -463,7 +463,7 @@ class RealNutClient:
             logger.error(f"Error listing RW variables: {e}")
             return {}
 
-    async def list_commands(self) -> list:
+    async def list_commands(self) -> list[str]:
         """列出 UPS 支持的即时命令
         
         NUT 协议: LIST CMD <upsname>

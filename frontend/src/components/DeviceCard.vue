@@ -565,6 +565,8 @@ const formatTime = (isoString: string): string => {
   right: 0;
   z-index: 1000;
   min-width: 180px;
+  max-height: 280px;
+  overflow-y: auto;
   margin-top: 0.25rem;
   padding: 0.5rem 0;
   background: var(--bg-primary);

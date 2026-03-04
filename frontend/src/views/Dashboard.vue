@@ -3885,6 +3885,7 @@ watch(latestHookProgress, (progress) => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: var(--ups-card-gap);
+  overflow: visible;
 }
 
 .devices-empty-card {

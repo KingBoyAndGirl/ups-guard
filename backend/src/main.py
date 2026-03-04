@@ -179,6 +179,38 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
+# 自定义 OpenAPI schema，添加 Bearer Token 认证支持
+def custom_openapi():
+    """为 Swagger UI 添加 Authorize 按钮"""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    from fastapi.openapi.utils import get_openapi
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    # 添加 Bearer Token 安全方案
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "description": "输入你的 API Token（不需要加 Bearer 前缀）"
+        }
+    }
+    # 全局应用安全方案
+    openapi_schema["security"] = [{"BearerAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+
+
 # 配置 CORS - 仅允许同域和配置的子域名
 allowed_origins = []
 if settings.allowed_origins:

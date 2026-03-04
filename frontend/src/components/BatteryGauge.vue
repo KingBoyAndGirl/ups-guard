@@ -19,6 +19,8 @@
         <polyline points="12 6 12 12 16 14" />
       </svg>
       <span>剩余约 {{ formatRuntime(runtime) }}</span>
+      <span v-if="estimated" class="runtime-source-badge estimated" title="由 NUT 软件估算">📐</span>
+      <span v-else class="runtime-source-badge hardware" title="UPS 硬件报告">📡</span>
     </div>
   </div>
 </template>
@@ -27,6 +29,7 @@
 defineProps<{
   charge: number
   runtime: number | null
+  estimated?: boolean | null
 }>()
 
 const getColor = (charge: number): string => {
@@ -98,5 +101,31 @@ const formatRuntime = (seconds: number): string => {
   width: 1rem;
   height: 1rem;
   stroke-width: 2;
+}
+
+/* 续航时间来源标记 */
+.runtime-source-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  padding: 0.0625rem 0.3rem;
+  border-radius: 0.25rem;
+  margin-left: 0.25rem;
+  font-weight: 500;
+  cursor: help;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.runtime-source-badge.estimated {
+  background: rgba(245, 158, 11, 0.15);
+  color: #D97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.runtime-source-badge.hardware {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 </style>

@@ -543,6 +543,9 @@ class UpsMonitor:
                 ups_vendorid=vars_dict.get("ups.vendorid"),
                 # 电池充电器状态 (NUT 标准)
                 battery_charger_status=vars_dict.get("battery.charger.status"),
+                # 续航时间来源：检查 driver.parameter.runtimecal 是否存在
+                # 存在 = 软件估算，不存在 = UPS 硬件直报
+                runtime_estimated=vars_dict.get("driver.parameter.runtimecal") is not None,
                 # 连接状态
                 nut_reconnect_count=self._reconnect_count if self._reconnect_count > 0 else None,
                 last_update=datetime.now()

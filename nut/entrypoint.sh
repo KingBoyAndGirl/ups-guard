@@ -28,6 +28,39 @@ log_error() {
     echo "$(date): [ERROR] $*"
 }
 
+# 生成 runtimecal 相关配置行
+# 参数: $1 = 驱动名称
+# 输出: runtimecal 配置行（如果需要的话），通过 stdout 返回
+generate_runtimecal_opts() {
+    local driver_name="$1"
+    local cal_value="$RUNTIME_CAL"
+
+    # 如果用户没有手动指定 RUNTIME_CAL，根据驱动类型自动决定
+    if [ -z "$cal_value" ]; then
+        case "$driver_name" in
+            nutdrv_qx|blazer_usb|blazer_ser)
+                # 这些驱动的 UPS 通常不报告 battery.runtime，使用保守默认值
+                # 300s@100% 满载，2400s@50% 空载 (适用于大多数家用小型 UPS)
+                cal_value="300,100,2400,50"
+                log_info "驱动 ${driver_name} 需要软件估算 battery.runtime，使用默认 runtimecal=${cal_value}"
+                ;;
+            *)
+                # usbhid-ups 等驱动通常硬件直接报告 battery.runtime，无需配置
+                return 0
+                ;;
+        esac
+    fi
+
+    # 输出配置行
+    if [ -n "$cal_value" ]; then
+        echo "    # 电池运行时间软件估算（runtimecal）"
+        echo "    # 格式: 满载秒数,满载charge%,空载秒数,空载charge%"
+        echo "    runtimecal = ${cal_value}"
+        echo "    chargetime = ${CHARGE_TIME}"
+        echo "    idleload = ${IDLE_LOAD}"
+    fi
+}
+
 # 从环境变量读取配置，提供默认值
 UPS_NAME=${UPS_NAME:-}  # 留空则自动生成
 UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
@@ -47,6 +80,18 @@ SHUTDOWN_CMD=${SHUTDOWN_CMD:-"/sbin/shutdown -h +0"}
 BATTERY_CHARGE_LOW=${BATTERY_CHARGE_LOW:-20}
 # 低运行时间阈值覆盖（秒），剩余时间低于此值触发低电量警告
 BATTERY_RUNTIME_LOW=${BATTERY_RUNTIME_LOW:-180}
+
+# ========== 电池运行时间估算参数 ==========
+# 适用于不直接报告 battery.runtime 的驱动（nutdrv_qx, blazer_usb 等）
+# 格式: 满载运行秒数,满载时charge%,空载运行秒数,空载时charge%
+# 留空则根据驱动类型自动决定是否使用默认值
+# 示例: RUNTIME_CAL=600,100,3600,50 表示满载10分钟，空载60分钟
+RUNTIME_CAL=${RUNTIME_CAL:-}
+# 电池从空充满的时间（秒），默认 6 小时
+CHARGE_TIME=${CHARGE_TIME:-21600}
+# 空闲负载百分比，解决 ups.load=0 时 runtime 计算为 0 的问题
+IDLE_LOAD=${IDLE_LOAD:-5}
+# ================================================
 
 # 用于自动生成 UPS_NAME 的变量
 AUTO_BRAND=""
@@ -234,6 +279,9 @@ if [ "$VENDOR_ID_LOWER" = "051d" ]; then
 "
 fi
 
+# 生成 runtimecal 配置
+RUNTIMECAL_OPTS=$(generate_runtimecal_opts "$UPS_DRIVER")
+
 cat > /etc/nut/ups.conf << EOF
 # 由 entrypoint.sh 自动生成
 # Driver discovery result: $UPS_DRIVER on $UPS_PORT
@@ -254,6 +302,7 @@ ${EXTRA_DRIVER_OPTS}    # 覆盖 UPS 报告的异常低电量阈值
     ignorelb
     # 增加轮询间隔，减少 USB 通信压力（低电量时 UPS 响应可能变慢）
     pollinterval = 5
+${RUNTIMECAL_OPTS}
 EOF
 
 echo "Generated ups.conf with driver: $UPS_DRIVER"
@@ -525,6 +574,10 @@ monitor_ups_driver() {
                         subdriver_opt="    subdriver = apc"
                     fi
 
+                    # 生成 runtimecal 配置
+                    local runtimecal_opts
+                    runtimecal_opts=$(generate_runtimecal_opts "${found_driver}")
+
                     # 重新生成 ups.conf
                     cat > /etc/nut/ups.conf << SWITCH_EOF
 # 由 monitor_ups_driver 自动切换到真实设备
@@ -546,6 +599,7 @@ ${subdriver_opt}
     # 忽略 UPS 硬件报告的 LB 标志
     ignorelb
     pollinterval = 5
+${runtimecal_opts}
 SWITCH_EOF
 
                     # 更新 upsmon.conf 中的 UPS 名称
@@ -703,6 +757,10 @@ SWITCH_EOF
                         subdriver_opt_wait="    subdriver = apc"
                     fi
 
+                    # 生成 runtimecal 配置
+                    local runtimecal_opts
+                    runtimecal_opts=$(generate_runtimecal_opts "${new_driver}")
+
                     cat > /etc/nut/ups.conf << DUMMY_WAIT_RECONNECT_EOF
 # 从 Dummy 等待模式恢复到真实设备
 # 时间: $(date)
@@ -723,6 +781,7 @@ ${subdriver_opt_wait}
     # 忽略 UPS 硬件报告的 LB 标志
     ignorelb
     pollinterval = 5
+${runtimecal_opts}
 DUMMY_WAIT_RECONNECT_EOF
 
                     sed -i "s/^MONITOR .* 1 $UPSMON_USER/MONITOR ${new_ups_name}@localhost 1 $UPSMON_USER/" /etc/nut/upsmon.conf
@@ -960,6 +1019,10 @@ DUMMY_WAIT_EOF
                     subdriver_opt_mon="    subdriver = apc"
                 fi
 
+                # 生成 runtimecal 配置
+                local runtimecal_opts
+                runtimecal_opts=$(generate_runtimecal_opts "${found_driver}")
+
                 # 重新生成 ups.conf
                 cat > /etc/nut/ups.conf << MONITOR_EOF
 # 由 monitor_ups_driver 自动重新生成
@@ -981,6 +1044,7 @@ ${subdriver_opt_mon}
     # 忽略 UPS 硬件报告的 LB 标志
     ignorelb
     pollinterval = 5
+${runtimecal_opts}
 MONITOR_EOF
 
                 # 更新 upsmon.conf 中的 UPS 名称

@@ -731,7 +731,9 @@
                 <div class="battery-runtime">
                   <span class="runtime-icon">🕐</span>
                   <span v-if="upsData.battery_runtime">
-                    UPS 报告续航: {{ formatRuntimeDetailed(upsData.battery_runtime) }}
+                    {{ upsData.runtime_estimated ? '估算续航' : 'UPS 报告续航' }}: {{ formatRuntimeDetailed(upsData.battery_runtime) }}
+                    <span v-if="upsData.runtime_estimated" class="runtime-source-badge estimated" title="由 NUT runtimecal 参数根据电池电量和负载估算，可能与实际有偏差">📐 估算</span>
+                    <span v-else class="runtime-source-badge hardware" title="由 UPS 硬件直接报告">📡 硬件</span>
                   </span>
                   <span v-else>续航时间未知</span>
                 </div>
@@ -1285,7 +1287,7 @@
                   </div>
                   <div class="prediction-compact-value">{{ formatMinutes(predictions.runtime_prediction.predicted_runtime_minutes) }}</div>
                   <div class="prediction-compact-meta">
-                    UPS 报告: {{ upsData.battery_runtime ? formatMinutes(Math.floor(upsData.battery_runtime / 60)) : 'N/A' }}
+                    {{ upsData?.runtime_estimated ? 'NUT 估算' : 'UPS 报告' }}: {{ upsData?.battery_runtime ? formatMinutes(Math.floor(upsData.battery_runtime / 60)) : 'N/A' }}
                   </div>
                 </div>
                 <div class="prediction-item-compact" v-if="predictions.anomalies?.available">
@@ -4061,6 +4063,32 @@ watch(latestHookProgress, (progress) => {
   gap: 0.375rem;
   color: var(--text-secondary);
   font-size: 0.8125rem;
+}
+
+/* 续航时间来源标记 */
+.runtime-source-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  padding: 0.0625rem 0.3rem;
+  border-radius: 0.25rem;
+  margin-left: 0.25rem;
+  font-weight: 500;
+  cursor: help;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.runtime-source-badge.estimated {
+  background: rgba(245, 158, 11, 0.15);
+  color: #D97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.runtime-source-badge.hardware {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .runtime-icon {

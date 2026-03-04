@@ -117,6 +117,8 @@ class UpsData(BaseModel):
     ups_vendorid: Optional[str] = None  # USB 厂商 ID - ups.vendorid
     # 电池充电器状态 (NUT 标准，替代 ups.status 中的 CHRG/DISCHRG 标志)
     battery_charger_status: Optional[str] = None  # battery.charger.status: charging/discharging/floating/resting
+    # 续航时间来源标记：True = 由 runtimecal 软件估算，False/None = UPS 硬件直报
+    runtime_estimated: Optional[bool] = None
     # 连接状态
     nut_reconnect_count: Optional[int] = None  # NUT 连接重连次数（用于前端显示）
 

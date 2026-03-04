@@ -63,6 +63,8 @@ export interface UpsData {
   ups_vendorid: string | null
   // 电池充电器状态 (NUT 标准)
   battery_charger_status: string | null
+  // 续航时间来源标记：true = runtimecal 软件估算，false/null = UPS 硬件直报
+  runtime_estimated: boolean | null
 }
 
 export interface ShutdownStatus {

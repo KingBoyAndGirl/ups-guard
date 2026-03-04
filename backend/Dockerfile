@@ -1,24 +1,20 @@
 # Build stage
-FROM python:3.11-slim as builder
-
-# 安装 uv
-RUN pip install --no-cache-dir uv
+FROM ghcr.io/astral-sh/uv:0.6-python3.11-bookworm-slim AS builder
 
 WORKDIR /app
 
-# 复制项目文件
+# 1️⃣ 先只复制依赖声明文件（利用 Docker 缓存）
 COPY pyproject.toml ./
-COPY src ./src
 
-# 使用 uv 安装依赖到临时目录
+# 2️⃣ 先安装依赖（代码没变时这一层会命中缓存）
 RUN uv pip install --system -r pyproject.toml
+
+# 3️⃣ 再复制源代码（代码变更不会触发重新安装依赖）
+COPY src ./src
 
 # Runtime stage
 FROM python:3.11-slim
 
-# 安装 curl 用于健康检查
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

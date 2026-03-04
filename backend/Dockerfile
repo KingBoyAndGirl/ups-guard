@@ -1,26 +1,26 @@
 # Build stage
-FROM ghcr.io/astral-sh/uv:0.6-python3.11-bookworm-slim AS builder
+FROM ghcr.io/astral-sh/uv:0.6.6-python3.11-bookworm-slim AS builder
 
 WORKDIR /app
 
 # 1️⃣ 先只复制依赖声明文件（利用 Docker 缓存）
 COPY pyproject.toml ./
 
-# 2️⃣ 先安装依赖（代码没变时这一层会命中缓存）
-RUN uv pip install --system -r pyproject.toml
+# 2️⃣ 使用 uv venv 安装依赖（代码没变时这一层会命中缓存）
+RUN uv venv /app/.venv && \
+    uv pip install --python /app/.venv/bin/python --no-cache -r pyproject.toml
 
 # 3️⃣ 再复制源代码（代码变更不会触发重新安装依赖）
 COPY src ./src
 
 # Runtime stage
-FROM python:3.11-slim
-
+FROM python:3.11.12-slim-bookworm
 
 WORKDIR /app
 
-# 从 builder 阶段复制已安装的依赖
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# 从 builder 阶段复制虚拟环境（比复制 site-packages 更小更快）
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # 复制应用代码
 COPY src ./src
@@ -40,7 +40,7 @@ USER appuser
 # 暴露端口
 EXPOSE 8000
 
-# 健康检查
+# 健康检查（用 python 内置模块，无需安装 curl）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 

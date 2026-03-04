@@ -487,12 +487,34 @@ class ShutdownManager:
                 logger.critical("Executing system shutdown NOW!")
                 success = await self.shutdown_client.shutdown()
                 
+                # 记录关机执行结果
+                history_service = await get_history_service()
+                notifier_service = get_notifier_service()
+
                 if success:
                     self._current_phase = "completed"
+                    await history_service.add_event(
+                        EventType.SHUTDOWN,
+                        "系统关机命令已执行"
+                    )
+                    await notifier_service.notify(
+                        EventType.SHUTDOWN,
+                        "系统关机中",
+                        "关机命令已成功执行，系统正在关闭。"
+                    )
                     return True
                 else:
                     logger.error("Failed to execute shutdown command")
                     self._current_phase = "idle"
+                    await history_service.add_event(
+                        EventType.SHUTDOWN,
+                        "系统关机命令执行失败"
+                    )
+                    await notifier_service.notify(
+                        EventType.SHUTDOWN,
+                        "关机执行失败",
+                        "关机命令执行失败，请检查系统状态。"
+                    )
                     return False
         
         except Exception as e:

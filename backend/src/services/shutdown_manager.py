@@ -305,12 +305,12 @@ class ShutdownManager:
                     # 关机成功通知（注意：如果真的关机了，这条消息可能发不出去）
                     await history_service.add_event(
                         EventType.SHUTDOWN,
-                        "系统关机命令已执行"
+                        "宿主机关机命令已执行"
                     )
                     await notifier_service.notify(
                         EventType.SHUTDOWN,
-                        "系统关机中",
-                        "关机命令已成功执行，系统正在关闭。"
+                        "宿主机关机中",
+                        "宿主机关机命令已成功执行，系统正在关闭。"
                     )
                 else:
                     logger.error("Failed to execute shutdown command")
@@ -318,12 +318,12 @@ class ShutdownManager:
                     # 关机失败通知
                     await history_service.add_event(
                         EventType.SHUTDOWN,
-                        "系统关机命令执行失败"
+                        "宿主机关机命令执行失败"
                     )
                     await notifier_service.notify(
                         EventType.SHUTDOWN,
                         "关机执行失败",
-                        "关机命令执行失败，请检查系统状态。"
+                        "宿主机关机命令执行失败，请检查系统状态。"
                     )
 
         except asyncio.CancelledError:
@@ -495,12 +495,12 @@ class ShutdownManager:
                     self._current_phase = "completed"
                     await history_service.add_event(
                         EventType.SHUTDOWN,
-                        "系统关机命令已执行"
+                        "宿主机关机命令已执行"
                     )
                     await notifier_service.notify(
                         EventType.SHUTDOWN,
-                        "系统关机中",
-                        "关机命令已成功执行，系统正在关闭。"
+                        "宿主机关机中",
+                        "宿主机关机命令已成功执行，系统正在关闭。"
                     )
                     return True
                 else:
@@ -508,12 +508,12 @@ class ShutdownManager:
                     self._current_phase = "idle"
                     await history_service.add_event(
                         EventType.SHUTDOWN,
-                        "系统关机命令执行失败"
+                        "宿主机关机命令执行失败"
                     )
                     await notifier_service.notify(
                         EventType.SHUTDOWN,
                         "关机执行失败",
-                        "关机命令执行失败，请检查系统状态。"
+                        "宿主机关机命令执行失败，请检查系统状态。"
                     )
                     return False
         

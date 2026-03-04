@@ -179,7 +179,9 @@ async def _auto_register_shutdown_hook(
         "hook_id": "agent_shutdown",
         "name": hook_name,
         "priority": next_priority,
-        "timeout": 120,
+        # timeout 需要覆盖：预关机命令总运行时间 + 关机命令下发时间（~60s）。
+        # 默认 300s = 约 4 分钟用于预关机命令 + 60s 用于关机命令下发。
+        "timeout": 300,
         "on_failure": "continue",
         "auto_registered": True,
         "config": {

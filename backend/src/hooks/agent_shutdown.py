@@ -36,7 +36,10 @@ class AgentShutdownHook(PreShutdownHook):
                 "required": False,
                 "default": 60,
                 "placeholder": "60",
-                "description": "执行关机前的等待秒数",
+                "description": (
+                    "向操作系统下发关机命令后的倒计时秒数（仅 Windows 生效，Linux/macOS 立即关机）。"
+                    "预关机命令会在此倒计时开始前全部执行完毕。"
+                ),
             },
             {
                 "key": "shutdown_message",
@@ -44,7 +47,7 @@ class AgentShutdownHook(PreShutdownHook):
                 "type": "text",
                 "required": False,
                 "placeholder": "UPS 电量不足，即将关机",
-                "description": "显示给用户的关机提示消息",
+                "description": "显示给已登录用户的关机提示消息（仅 Windows 支持）",
             },
             {
                 "key": "pre_commands",
@@ -52,7 +55,11 @@ class AgentShutdownHook(PreShutdownHook):
                 "type": "textarea",
                 "required": False,
                 "placeholder": "echo pre-shutdown\nsync",
-                "description": "关机前在目标设备上逐行执行的命令",
+                "description": (
+                    "关机前在目标设备上逐行执行的命令（每行一条）。"
+                    "所有命令执行完毕后才会发送关机指令，关机延迟倒计时从命令执行完毕后才开始。"
+                    "⚠️ 请确保「任务超时」设置 ≥ 所有预关机命令预计耗时之和 + 关机延迟秒数，否则任务超时后关机命令将不会下发。"
+                ),
             },
             {
                 "key": "mac_address",
@@ -104,21 +111,29 @@ class AgentShutdownHook(PreShutdownHook):
 
         agent_id = self.config.get("agent_id", "").strip()
         manager = get_agent_manager()
+        shutdown_delay = self.config.get("shutdown_delay", 60)
 
-        # 先执行预关机命令（逐条）
+        # 先执行预关机命令（逐条），全部执行完后再发关机指令
         pre_commands_str = self.config.get("pre_commands", "").strip()
         if pre_commands_str:
             pre_commands = [cmd.strip() for cmd in pre_commands_str.split("\n") if cmd.strip()]
+            logger.info(
+                f"AgentShutdownHook: running {len(pre_commands)} pre_command(s) on agent={agent_id} "
+                f"before issuing shutdown (delay={shutdown_delay}s)"
+            )
             for cmd in pre_commands:
                 result = await manager.send_command(
                     agent_id, "execute", {"command": cmd}
                 )
                 if not result.get("success", False):
                     logger.warning(
-                        f"AgentShutdownHook: pre_command failed: {cmd} — {result.get('message')}"
+                        f"AgentShutdownHook: pre_command failed: {cmd!r} — {result.get('message')}"
                     )
+            logger.info(
+                f"AgentShutdownHook: pre_commands complete, issuing shutdown with delay={shutdown_delay}s"
+            )
 
-        # 执行关机
+        # 执行关机（关机延迟倒计时从此刻开始）
         return await self._send_action("shutdown")
 
     async def test_connection(self) -> bool:

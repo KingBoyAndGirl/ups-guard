@@ -140,7 +140,7 @@ class ConfigWindow:
         self._set_window_icon(root, None)
 
         # 居中显示 — 加宽窗口
-        win_w, win_h = 580, 470
+        win_w, win_h = 580, 540
         scr_w = root.winfo_screenwidth()
         scr_h = root.winfo_screenheight()
         x = (scr_w - win_w) // 2
@@ -231,6 +231,35 @@ class ConfigWindow:
             font=("", 8), foreground="grey", wraplength=540, justify="left",
         )
         tip.pack(padx=20, anchor="w")
+
+        # --- 服务端关机配置（只读展示） ---
+        shutdown_frame = ttk.LabelFrame(root, text="服务端关机配置", padding=(12, 6))
+        shutdown_frame.pack(fill="x", padx=20, pady=(8, 2))
+
+        sd_row = ttk.Frame(shutdown_frame)
+        sd_row.pack(fill="x", pady=2)
+        ttk.Label(sd_row, text="关机延迟（秒）：", width=16, anchor="e").pack(side="left")
+        self._srv_delay_var = tk.StringVar(value="—")
+        ttk.Label(sd_row, textvariable=self._srv_delay_var, foreground="navy").pack(side="left")
+
+        sm_row = ttk.Frame(shutdown_frame)
+        sm_row.pack(fill="x", pady=2)
+        ttk.Label(sm_row, text="关机提示消息：", width=16, anchor="e").pack(side="left")
+        self._srv_message_var = tk.StringVar(value="—")
+        ttk.Label(sm_row, textvariable=self._srv_message_var, foreground="navy",
+                  wraplength=380, justify="left").pack(side="left")
+
+        srv_info_row = ttk.Frame(shutdown_frame)
+        srv_info_row.pack(fill="x", pady=(2, 0))
+        self._srv_info_label = tk.Label(
+            srv_info_row, text='（点击"从服务端刷新"获取最新配置）',
+            font=("", 8), foreground="grey",
+        )
+        self._srv_info_label.pack(side="left")
+        ttk.Button(
+            srv_info_row, text="从服务端刷新",
+            command=self._refresh_server_shutdown_config,
+        ).pack(side="right")
 
         # --- 开机自启复选框 ---
         self._autostart_var = tk.BooleanVar(value=is_autostart_enabled())
@@ -490,5 +519,72 @@ class ConfigWindow:
         with _window_lock:
             if _window_instance is self:
                 _window_instance = None
+
+    # ------------------------------------------------------------------ #
+    #  从服务端刷新关机配置
+    # ------------------------------------------------------------------ #
+    def _refresh_server_shutdown_config(self):
+        """后台线程：从服务端 /api/config 拉取关机配置并更新 UI"""
+        threading.Thread(target=self._do_refresh_server_config, daemon=True).start()
+
+    def _do_refresh_server_config(self):
+        from ups_guard_agent.config import AgentConfig
+        import urllib.request
+        import urllib.error
+        import json
+
+        cfg = AgentConfig.load()
+        if not cfg.server_url or not cfg.token:
+            self._update_srv_info("❌ 请先填写服务器地址和 Token", "red")
+            return
+
+        url = cfg.server_url.rstrip("/") + "/api/config"
+        req = urllib.request.Request(
+            url,
+            headers={"Authorization": f"Bearer {cfg.token}"},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+        except urllib.error.URLError as e:
+            self._update_srv_info(f"❌ 无法连接服务端（{e.reason}）", "red")
+            return
+        except TimeoutError:
+            self._update_srv_info("❌ 连接服务端超时，请检查网络", "red")
+            return
+        except Exception as e:
+            self._update_srv_info(f"❌ 获取配置失败：{e}", "red")
+            return
+
+        hooks = data.get("pre_shutdown_hooks", [])
+        for hook in hooks:
+            if hook.get("hook_id") != "agent_shutdown":
+                continue
+            hook_cfg = hook.get("config", {})
+            if hook_cfg.get("agent_id", "") == cfg.agent_id:
+                delay = hook_cfg.get("shutdown_delay", "—")
+                message = hook_cfg.get("shutdown_message", "（未设置）")
+                self._update_srv_delay(str(delay))
+                self._update_srv_message(message or "（未设置）")
+                self._update_srv_info("✅ 已从服务端同步", "green")
+                logger.info(f"Server shutdown config: delay={delay} message={message!r}")
+                return
+
+        self._update_srv_info("⚠️ 服务端未找到本机的关机配置（Agent 需先连接一次服务端）", "darkorange")
+
+    def _update_srv_delay(self, value: str):
+        if self._root:
+            self._root.after(0, lambda: self._srv_delay_var.set(value))
+
+    def _update_srv_message(self, value: str):
+        if self._root:
+            self._root.after(0, lambda: self._srv_message_var.set(value))
+
+    def _update_srv_info(self, text: str, color: str):
+        if self._root:
+            self._root.after(
+                0, lambda: self._srv_info_label.config(text=text, foreground=color)
+            )
 
 

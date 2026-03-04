@@ -1,10 +1,11 @@
-"""LZCOS gRPC 关机客户端"""
+"""关机客户端模块 - 支持多种关机方式"""
 import grpc
 import logging
 import asyncio
 import socket
 import os
 import platform
+import shutil
 import subprocess
 from typing import Protocol
 
@@ -140,75 +141,239 @@ class MockShutdown:
         return True
 
 
+def _is_running_in_docker() -> bool:
+    """检测是否运行在 Docker 容器中"""
+    if os.path.exists('/.dockerenv'):
+        return True
+    try:
+        with open('/proc/1/cgroup', 'r') as f:
+            content = f.read()
+            if 'docker' in content or 'containerd' in content:
+                return True
+    except (FileNotFoundError, PermissionError):
+        pass
+    if os.environ.get('DOCKER_CONTAINER') or os.environ.get('container'):
+        return True
+    return False
+
+
+def _find_shutdown_command() -> str | None:
+    """查找系统中可用的 shutdown 命令路径"""
+    # 尝试多个常见路径
+    candidates = [
+        '/sbin/shutdown',
+        '/usr/sbin/shutdown',
+        '/bin/shutdown',
+        '/usr/bin/shutdown',
+    ]
+    for path in candidates:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            logger.debug(f"Found shutdown command at: {path}")
+            return path
+
+    # 最后尝试 PATH 搜索
+    found = shutil.which('shutdown')
+    if found:
+        logger.debug(f"Found shutdown command via PATH: {found}")
+    return found
+
+
+def _find_poweroff_command() -> str | None:
+    """查找 poweroff/reboot 命令路径"""
+    candidates = [
+        '/sbin/poweroff',
+        '/usr/sbin/poweroff',
+        '/bin/poweroff',
+    ]
+    for path in candidates:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return shutil.which('poweroff')
+
+
 class SystemCommandShutdown:
-    """系统命令关机实现（通用跨平台）"""
-    
+    """
+    系统命令关机实现（通用跨平台）
+
+    支持多种运行环境：
+    - Docker 容器内（需要 --pid=host + --privileged）
+    - 原生 Linux/macOS
+    - Windows
+    """
+
     def __init__(self):
         self.os_type = platform.system()
+        self.in_docker = _is_running_in_docker()
+        if self.in_docker:
+            logger.info("Detected Docker environment, will use nsenter for host shutdown")
+        else:
+            logger.info(f"Detected native {self.os_type} environment")
 
-    def _get_shutdown_command(self) -> list:
-        """获取关机命令"""
+    def _build_shutdown_commands(self) -> list[list[str]]:
+        """
+        构建关机命令候选列表（按优先级排列）。
+        返回多个候选命令，依次尝试直到成功。
+        """
         if self.os_type == "Windows":
-            # Windows: shutdown /s /t 0 /f
-            return ["shutdown", "/s", "/t", "0", "/f"]
-        elif self.os_type in ("Linux", "Darwin"):
-            # Linux/macOS: shutdown -h now (需要 root 权限)
-            return ["shutdown", "-h", "now"]
-        else:
+            return [["shutdown", "/s", "/t", "0", "/f"]]
+
+        if self.os_type not in ("Linux", "Darwin"):
             raise RuntimeError(f"Unsupported OS: {self.os_type}")
-    
-    def _get_reboot_command(self) -> list:
-        """获取重启命令"""
+
+        commands: list[list[str]] = []
+
+        if self.in_docker:
+            # 策略 1: nsenter 进入宿主机 PID 1 命名空间执行关机
+            # 需要容器以 --pid=host --privileged 启动
+            nsenter_path = shutil.which('nsenter')
+            if nsenter_path:
+                shutdown_in_host = '/sbin/shutdown'  # 宿主机上的路径
+                commands.append([
+                    nsenter_path, '-t', '1', '-m', '-u', '-i', '-n', '-p',
+                    '--', shutdown_in_host, '-h', 'now'
+                ])
+                logger.debug("Strategy 1 (nsenter) available")
+
+            # 策略 2: 容器内直接使用 poweroff -f
+            poff = _find_poweroff_command()
+            if poff:
+                commands.append([poff, '-f'])
+                logger.debug(f"Strategy 2 (poweroff) available at {poff}")
+
+            # 策略 3: 容器内直接使用 shutdown（如果容器中安装了）
+            shutdown_cmd = _find_shutdown_command()
+            if shutdown_cmd:
+                commands.append([shutdown_cmd, '-h', 'now'])
+                logger.debug(f"Strategy 3 (shutdown in container) available at {shutdown_cmd}")
+        else:
+            # 非 Docker：直接使用 shutdown
+            shutdown_cmd = _find_shutdown_command()
+            if shutdown_cmd:
+                commands.append([shutdown_cmd, '-h', 'now'])
+            else:
+                # 退而求其次用 poweroff
+                poff = _find_poweroff_command()
+                if poff:
+                    commands.append([poff, '-f'])
+
+        if not commands:
+            logger.error(
+                "No shutdown command found! "
+                "In Docker, ensure the container runs with --pid=host --privileged "
+                "and nsenter is installed."
+            )
+
+        return commands
+
+    def _build_reboot_commands(self) -> list[list[str]]:
+        """构建重启命令候选列表"""
         if self.os_type == "Windows":
-            # Windows: shutdown /r /t 0 /f
-            return ["shutdown", "/r", "/t", "0", "/f"]
-        elif self.os_type in ("Linux", "Darwin"):
-            # Linux/macOS: shutdown -r now
-            return ["shutdown", "-r", "now"]
-        else:
+            return [["shutdown", "/r", "/t", "0", "/f"]]
+
+        if self.os_type not in ("Linux", "Darwin"):
             raise RuntimeError(f"Unsupported OS: {self.os_type}")
-    
-    async def _execute_command(self, command: list, operation: str) -> bool:
+
+        commands: list[list[str]] = []
+
+        if self.in_docker:
+            nsenter_path = shutil.which('nsenter')
+            if nsenter_path:
+                commands.append([
+                    nsenter_path, '-t', '1', '-m', '-u', '-i', '-n', '-p',
+                    '--', '/sbin/shutdown', '-r', 'now'
+                ])
+
+            shutdown_cmd = _find_shutdown_command()
+            if shutdown_cmd:
+                commands.append([shutdown_cmd, '-r', 'now'])
+        else:
+            shutdown_cmd = _find_shutdown_command()
+            if shutdown_cmd:
+                commands.append([shutdown_cmd, '-r', 'now'])
+
+        return commands
+
+    async def _execute_command(self, command: list[str], operation: str) -> bool:
         """执行系统命令"""
         try:
-
-            # 在线程池中执行命令（避免阻塞事件循环）
+            logger.info(f"Executing {operation}: {' '.join(command)}")
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
                 None,
-                lambda: subprocess.run(command, capture_output=True, text=True, timeout=10)
+                lambda: subprocess.run(
+                    command, capture_output=True, text=True, timeout=10
+                )
             )
-            
+
             if result.returncode == 0:
+                logger.info(f"{operation} command succeeded")
                 return True
             else:
-                logger.error(f"{operation} command failed with code {result.returncode}")
-                logger.error(f"stderr: {result.stderr}")
+                logger.warning(
+                    f"{operation} command exited with code {result.returncode}, "
+                    f"stderr: {result.stderr.strip()}"
+                )
                 return False
-        
+
+        except FileNotFoundError as e:
+            logger.warning(f"{operation} command not found: {e}")
+            return False
         except subprocess.TimeoutExpired:
             logger.error(f"{operation} command timed out")
             return False
         except Exception as e:
-            logger.error(f"{operation} command failed: {e}")
+            logger.warning(f"{operation} command failed: {type(e).__name__}: {e}")
             return False
-    
+
+    async def _execute_with_fallback(
+        self, commands: list[list[str]], operation: str
+    ) -> bool:
+        """依次尝试多个命令，直到有一个成功"""
+        if not commands:
+            logger.error(
+                f"No {operation.lower()} commands available. "
+                f"Docker={self.in_docker}, OS={self.os_type}. "
+                f"If running in Docker, add 'pid: host' and 'privileged: true' "
+                f"to docker-compose.yml for the backend service."
+            )
+            return False
+
+        for i, cmd in enumerate(commands, 1):
+            logger.info(
+                f"Trying {operation} strategy {i}/{len(commands)}: "
+                f"{' '.join(cmd)}"
+            )
+            success = await self._execute_command(cmd, operation)
+            if success:
+                return True
+            logger.warning(
+                f"Strategy {i} failed, "
+                f"{'trying next...' if i < len(commands) else 'no more strategies.'}"
+            )
+
+        logger.error(f"All {operation.lower()} strategies exhausted")
+        return False
+
     async def shutdown(self) -> bool:
         """执行关机"""
-        command = self._get_shutdown_command()
-        return await self._execute_command(command, "Shutdown")
-    
+        commands = self._build_shutdown_commands()
+        return await self._execute_with_fallback(commands, "Shutdown")
+
     async def reboot(self) -> bool:
         """执行重启"""
-        command = self._get_reboot_command()
-        return await self._execute_command(command, "Reboot")
+        commands = self._build_reboot_commands()
+        return await self._execute_with_fallback(commands, "Reboot")
 
 
-def create_shutdown_client(socket_path: str, mock_mode: bool = False, shutdown_method: str = "lzc_grpc") -> ShutdownInterface:
+def create_shutdown_client(
+    socket_path: str,
+    mock_mode: bool = False,
+    shutdown_method: str = "lzc_grpc",
+) -> ShutdownInterface:
     """创建关机客户端实例"""
     if mock_mode:
         return MockShutdown()
-    
+
     if shutdown_method == "system_command":
         return SystemCommandShutdown()
     elif shutdown_method == "lzc_grpc":
@@ -216,5 +381,7 @@ def create_shutdown_client(socket_path: str, mock_mode: bool = False, shutdown_m
     elif shutdown_method == "mock":
         return MockShutdown()
     else:
-        logger.warning(f"Unknown shutdown_method '{shutdown_method}', defaulting to lzc_grpc")
+        logger.warning(
+            f"Unknown shutdown_method '{shutdown_method}', defaulting to lzc_grpc"
+        )
         return LzcGrpcShutdown(socket_path)

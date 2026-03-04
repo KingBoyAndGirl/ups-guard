@@ -526,10 +526,15 @@
               <div class="form-group">
                 <label class="form-label"><span class="label-text">宿主关机方式</span></label>
                 <select v-model="config.shutdown_method" class="form-control">
-                  <option value="system_command">系统命令（System Command）- 推荐</option>
+                  <option value="lzc_grpc">懒猫微服 gRPC（LZC gRPC）- 懒猫专用</option>
+                  <option value="system_command">系统命令（System Command）- 通用</option>
                   <option value="mock">测试模式（Mock）</option>
                 </select>
-                <small class="help-text">更改关机方式需要重启服务才能生效</small>
+                <small class="help-text">
+                  <strong>懒猫 gRPC</strong>：通过 LZCOS API 关机（需挂载 gRPC socket）；
+                  <strong>系统命令</strong>：通用方式（Docker 中需 privileged + pid:host）。
+                  更改后需重启服务生效
+                </small>
               </div>
               <div class="form-group">
                 <label class="checkbox-label"><input v-model="config.wol_on_power_restore" type="checkbox" class="checkbox-input"/><span class="checkbox-text">来电后自动唤醒（Wake On LAN）</span></label>

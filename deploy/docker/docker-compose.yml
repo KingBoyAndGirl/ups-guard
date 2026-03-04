@@ -57,6 +57,12 @@ services:
       dockerfile: Dockerfile
     container_name: ups-guard-backend
     restart: unless-stopped
+    # ============================================================
+    # 如需使用 system_command 方式关闭宿主机，取消以下两行注释：
+    # （默认 lzc_grpc 方式不需要这些权限）
+    # privileged: true
+    # pid: "host"
+    # ============================================================
     environment:
       - NUT_HOST=nut-server
       - NUT_PORT=3493

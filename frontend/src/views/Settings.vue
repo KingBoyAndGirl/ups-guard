@@ -529,6 +529,7 @@
                   <option value="system_command">系统命令（System Command）- 推荐</option>
                   <option value="mock">测试模式（Mock）</option>
                 </select>
+                <small class="help-text">更改关机方式需要重启服务才能生效</small>
               </div>
               <div class="form-group">
                 <label class="checkbox-label"><input v-model="config.wol_on_power_restore" type="checkbox" class="checkbox-input"/><span class="checkbox-text">来电后自动唤醒（Wake On LAN）</span></label>

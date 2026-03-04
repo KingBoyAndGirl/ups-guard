@@ -1,6 +1,7 @@
 """配置 API"""
 import uuid
 import json
+import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
@@ -9,9 +10,11 @@ from typing import List, Dict, Any, Optional
 from models import Config, NotifierConfig
 from config import get_config_manager, APP_VERSION
 from services.notifier import get_notifier_service
+from services.monitor import get_monitor
 import io
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class ConfigUpdate(BaseModel):
@@ -77,6 +80,46 @@ async def update_config(config_update: ConfigUpdate):
     notifier_service = get_notifier_service()
     notify_channels = [NotifierConfig(**ch) for ch in config.notify_channels]
     notifier_service.configure(notify_channels, config.notify_events, config.notification_enabled)
+
+    # ========== 热更新运行中的服务实例 ==========
+
+    # 2. ShutdownManager（关机策略）
+    monitor = get_monitor()
+    if monitor and monitor.shutdown_manager:
+        sm = monitor.shutdown_manager
+        old_vals = (sm.wait_minutes, sm.battery_percent, sm.final_wait_seconds,
+                    sm.estimated_runtime_threshold, sm.test_mode)
+
+        sm.wait_minutes = config.shutdown_wait_minutes
+        sm.battery_percent = config.shutdown_battery_percent
+        sm.final_wait_seconds = config.shutdown_final_wait_seconds
+        sm.estimated_runtime_threshold = config.estimated_runtime_threshold
+        sm.test_mode = config.test_mode
+
+        new_vals = (sm.wait_minutes, sm.battery_percent, sm.final_wait_seconds,
+                    sm.estimated_runtime_threshold, sm.test_mode)
+        if old_vals != new_vals:
+            logger.info(
+                f"ShutdownManager hot-reloaded: wait={sm.wait_minutes}min, "
+                f"battery={sm.battery_percent}%, final_wait={sm.final_wait_seconds}s, "
+                f"runtime_threshold={sm.estimated_runtime_threshold}min, "
+                f"test_mode={sm.test_mode}"
+            )
+
+    # 3. UpsMonitor（轮询间隔 + config 引用）
+    if monitor:
+        old_poll = monitor.poll_interval
+        old_sample = monitor.sample_interval
+
+        monitor.poll_interval = config.poll_interval_seconds
+        monitor.sample_interval = config.sample_interval_seconds
+        monitor.config = config  # 同步 monitoring_mode, event_driven_* 等
+
+        if old_poll != monitor.poll_interval or old_sample != monitor.sample_interval:
+            logger.info(
+                f"UpsMonitor hot-reloaded: poll_interval={monitor.poll_interval}s, "
+                f"sample_interval={monitor.sample_interval}s"
+            )
 
     return {"success": True, "message": "配置已更新"}
 

@@ -505,7 +505,7 @@ async def get_test_report():
                 latest_report = await report_service.get_latest_report()
                 if latest_report:
                     db_result = latest_report.get('result')
-                    
+
                     if db_result == 'in_progress':
                         # 测试正在进行中 → 显示"测试中"
                         test_status = 'in_progress'

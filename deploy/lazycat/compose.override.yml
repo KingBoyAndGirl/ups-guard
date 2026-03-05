@@ -1,0 +1,3 @@
+services:
+  ups-guard:
+    privileged: true

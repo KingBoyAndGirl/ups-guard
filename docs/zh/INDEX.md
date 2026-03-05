@@ -6,6 +6,7 @@
 - [⚙️ 安装指南](install.md) - 详细安装步骤
 - [🐳 Docker部署](docker-deployment.md) - Docker容器化部署
 - [👤 用户手册](user-guide.md) - 完整使用指南
+- [📘 用户使用说明 v1.0.71](user-manual-v1.0.71.md) - 面向终端用户的完整操作手册（含DC UPS、瓦力方程设备支持）
 
 ## 功能指南
 
@@ -40,7 +41,8 @@ docs/zh/
 ├── INDEX.md                      # 本文件，文档导航
 ├── install.md                    # 安装指南
 ├── docker-deployment.md          # Docker部署
-├── user-guide.md                 # 用户手册
+├── user-guide.md                 # 用户手册（开发者/高级用户）
+├── user-manual-v1.0.71.md        # 用户使用说明（终端用户完整操作手册）
 ├── faq.md                        # 常见问题
 ├── supported-ups.md              # 支持的UPS
 ├── push-setup.md                 # 推送设置

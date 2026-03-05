@@ -1,19 +1,19 @@
-# N/A 参数测试报告
+# WL W120 参数测试报告
 
 > 本报告由 `test_nut_parameters.py` 自动生成  
-> 测试时间: 2026-03-05 19:48:20  
-> NUT 驱动: N/A 
+> 测试时间: 2026-03-05 20:27:08  
+> NUT 驱动: usbhid-ups 2.8.2
 
 ## 📊 测试概览
 
 | 项目 | 数值 |
 |------|------|
-| UPS 名称 | N/A |
-| 制造商 |  |
-| 型号 | N/A |
-| 序列号 | N/A |
+| UPS 名称 | WL W120 |
+| 制造商 | WL |
+| 型号 | W120 |
+| 序列号 | 123456788888 |
 | 额定功率 | N/AW |
-| UPS 提供变量数 | 0 |
+| UPS 提供变量数 | 43 |
 | NUT 标准变量库 | 614 |
 
 ---
@@ -44,15 +44,16 @@
 
 ### 当前 UPS 状态解读
 
-**状态码**: ``
+**状态码**: `ALARM OL`
 
-  - 状态正常
+  - **ALARM**: 🚨 告警
+  - **OL**: 🟢 在线（市电供电）
 
 **关键指标**:
-- 输入电压: **N/AV** (额定 220V)
-- 电池电量: **N/A%**
-- 电池电压: **N/AV** (额定 12V)
-- 剩余时间: **N/A**
+- 输入电压: **12.49V** (额定 220V)
+- 电池电量: **100%**
+- 电池电压: **13.53V** (额定 12V)
+- 剩余时间: **177分50秒**
 - UPS 负载: **N/A%**
 
 ---
@@ -63,9 +64,97 @@
 ## UPS 实际提供的所有变量
 
 
-> 📊 **UPS 提供的变量总数: 0**  
-> 🔵 项目已使用: 0  
-> 🆕 可添加到项目: 0
+### 📁 UPS信息 (7 个变量)
+
+| 状态 | 变量名 | 值 | 描述 |
+|:----:|--------|-----|------|
+| 🔵 | `ups.alarm` | `No battery installed!` | UPS报警 |
+| 🔵 | `ups.mfr` | `WL` | UPS制造商 |
+| 🔵 | `ups.model` | `W120` | UPS型号 |
+| 🆕 | `ups.productid` | `d005` | USB产品ID |
+| 🆕 | `ups.serial` | `123456788888` | UPS序列号 |
+| 🔵 | `ups.status` | `ALARM OL` | UPS状态 (OL/OB/LB/HB/RB/CHRG/DISCHRG/BYPASS/CAL/OFF/OVER/TRIM/BOOST/FSD) |
+| 🆕 | `ups.vendorid` | `04d8` | USB厂商ID |
+
+### 📁 电池 (11 个变量)
+
+| 状态 | 变量名 | 值 | 描述 |
+|:----:|--------|-----|------|
+| 🆕 | `battery.capacity` | `100` | 电池容量(Ah) |
+| 🔵 | `battery.charge` | `100` | 电池电量(%) |
+| 🆕 | `battery.charge.low` | `20` | 低电量阈值(%) |
+| 🆕 | `battery.charge.warning` | `5` | 警告电量阈值(%) |
+| 🆕 | `battery.current` | `0.160` | 电池电流(A) |
+| 🔵 | `battery.mfr.date` | `OPEN` | 电池生产日期 |
+| 🔵 | `battery.runtime` | `10670` | 剩余运行时间(秒) |
+| 🆕 | `battery.runtime.low` | `180` | 低运行时间阈值(秒) |
+| 🔵 | `battery.temperature` | `30` | 电池温度(°C) |
+| 🔵 | `battery.type` | `LiFePO4` | 电池类型 |
+| 🔵 | `battery.voltage` | `13.53` | 电池电压(V) |
+
+### 📁 设备信息 (4 个变量)
+
+| 状态 | 变量名 | 值 | 描述 |
+|:----:|--------|-----|------|
+| 🆕 | `device.mfr` | `WL` | 设备制造商 |
+| 🆕 | `device.model` | `W120` | 设备型号 |
+| 🆕 | `device.serial` | `123456788888` | 设备序列号 |
+| 🆕 | `device.type` | `ups` | 设备类型 (ups/pdu/scd/psu/ats) |
+
+### 📁 输入电源 (2 个变量)
+
+| 状态 | 变量名 | 值 | 描述 |
+|:----:|--------|-----|------|
+| 🆕 | `input.current` | `1.116` | 输入电流(A) |
+| 🔵 | `input.voltage` | `12.49` | 输入电压(V) |
+
+### 📁 输出电源 (2 个变量)
+
+| 状态 | 变量名 | 值 | 描述 |
+|:----:|--------|-----|------|
+| 🔵 | `output.current` | `0.956` | 输出电流(A) |
+| 🔵 | `output.voltage` | `12.49` | 输出电压(V) |
+
+### 📁 驱动信息 (4 个变量)
+
+| 状态 | 变量名 | 值 | 描述 |
+|:----:|--------|-----|------|
+| 🆕 | `driver.debug` | `0` | 调试级别 |
+| 🆕 | `driver.name` | `usbhid-ups` | 驱动名称 |
+| 🆕 | `driver.state` | `quiet` | 驱动状态 |
+| 🆕 | `driver.version` | `2.8.2` | 驱动版本 |
+
+### 📁 驱动参数 (8 个变量)
+
+| 状态 | 变量名 | 值 | 描述 |
+|:----:|--------|-----|------|
+| 🆕 | `driver.parameter.override.battery.charge.low` | `20` | - |
+| 🆕 | `driver.parameter.override.battery.runtime.low` | `180` | - |
+| 🆕 | `driver.parameter.pollfreq` | `30` | 轮询频率 |
+| 🆕 | `driver.parameter.pollinterval` | `5` | 轮询间隔 |
+| 🆕 | `driver.parameter.port` | `auto` | 驱动端口 |
+| 🆕 | `driver.parameter.productid` | `D005` | 产品ID参数 |
+| 🆕 | `driver.parameter.synchronous` | `auto` | 同步模式 |
+| 🆕 | `driver.parameter.vendorid` | `04D8` | 厂商ID参数 |
+
+### 📁 驱动标志 (2 个变量)
+
+| 状态 | 变量名 | 值 | 描述 |
+|:----:|--------|-----|------|
+| 🆕 | `driver.flag.allow_killpower` | `0` | 允许killpower |
+| 🆕 | `driver.flag.ignorelb` | `enabled` | - |
+
+### 📁 驱动版本 (3 个变量)
+
+| 状态 | 变量名 | 值 | 描述 |
+|:----:|--------|-----|------|
+| 🆕 | `driver.version.data` | `openUPS HID 0.5` | 数据版本 |
+| 🆕 | `driver.version.internal` | `0.53` | 内部驱动版本 |
+| 🆕 | `driver.version.usb` | `libusb-1.0.27 (API: 0x100010a)` | USB库版本 |
+
+> 📊 **UPS 提供的变量总数: 43**  
+> 🔵 项目已使用: 13  
+> 🆕 可添加到项目: 30
 
 ## NUT 标准变量测试 (测试所有 614 个标准变量)
 
@@ -74,7 +163,7 @@
 
 | 分类 | 可用 | 不可用 | 覆盖率 |
 |------|-----:|-------:|-------:|
-| UPS信息 | 0 | 39 | 0.0% |
+| UPS信息 | 7 | 32 | 17.9% |
 | 实验性 | 0 | 3 | 0.0% |
 | 插座/PDU | 0 | 17 | 0.0% |
 | 插座1 | 0 | 21 | 0.0% |
@@ -104,8 +193,8 @@
 | 环境传感器1 | 0 | 2 | 0.0% |
 | 环境传感器2 | 0 | 2 | 0.0% |
 | 环境监控 | 0 | 19 | 0.0% |
-| 电池 | 0 | 30 | 0.0% |
-| 设备信息 | 0 | 11 | 0.0% |
+| 电池 | 11 | 19 | 36.7% |
+| 设备信息 | 4 | 7 | 36.4% |
 | 输入L1-L2线 | 0 | 1 | 0.0% |
 | 输入L1-N相 | 0 | 1 | 0.0% |
 | 输入L1相 | 0 | 9 | 0.0% |
@@ -115,7 +204,7 @@
 | 输入L3-L1线 | 0 | 1 | 0.0% |
 | 输入L3-N相 | 0 | 1 | 0.0% |
 | 输入L3相 | 0 | 9 | 0.0% |
-| 输入电源 | 0 | 34 | 0.0% |
+| 输入电源 | 2 | 32 | 5.9% |
 | 输出L1-L2线 | 0 | 1 | 0.0% |
 | 输出L1-N相 | 0 | 1 | 0.0% |
 | 输出L1相 | 0 | 7 | 0.0% |
@@ -125,24 +214,68 @@
 | 输出L3-L1线 | 0 | 1 | 0.0% |
 | 输出L3-N相 | 0 | 1 | 0.0% |
 | 输出L3相 | 0 | 7 | 0.0% |
-| 输出电源 | 0 | 11 | 0.0% |
-| 驱动信息 | 0 | 4 | 0.0% |
-| 驱动参数 | 0 | 11 | 0.0% |
-| 驱动标志 | 0 | 1 | 0.0% |
-| 驱动版本 | 0 | 3 | 0.0% |
-| **总计** | **0** | **614** | **0.0%** |
+| 输出电源 | 2 | 9 | 18.2% |
+| 驱动信息 | 4 | 0 | 100.0% |
+| 驱动参数 | 6 | 5 | 54.5% |
+| 驱动标志 | 1 | 0 | 100.0% |
+| 驱动版本 | 3 | 0 | 100.0% |
+| **总计** | **40** | **574** | **6.5%** |
 
-### ❌ 不可用的 NUT 标准变量 (614 个)
+### ✅ 可用的 NUT 标准变量 (40 个)
+
+| 变量名 | 值 | 描述 |
+|--------|-----|------|
+| `battery.capacity` | `100` | 电池容量(Ah) |
+| `battery.charge` | `100` | 电池电量(%) |
+| `battery.charge.low` | `20` | 低电量阈值(%) |
+| `battery.charge.warning` | `5` | 警告电量阈值(%) |
+| `battery.current` | `0.160` | 电池电流(A) |
+| `battery.mfr.date` | `OPEN` | 电池生产日期 |
+| `battery.runtime` | `10670` | 剩余运行时间(秒) |
+| `battery.runtime.low` | `180` | 低运行时间阈值(秒) |
+| `battery.temperature` | `30` | 电池温度(°C) |
+| `battery.type` | `LiFePO4` | 电池类型 |
+| `battery.voltage` | `13.53` | 电池电压(V) |
+| `device.mfr` | `WL` | 设备制造商 |
+| `device.model` | `W120` | 设备型号 |
+| `device.serial` | `123456788888` | 设备序列号 |
+| `device.type` | `ups` | 设备类型 (ups/pdu/scd/psu/ats) |
+| `driver.debug` | `0` | 调试级别 |
+| `driver.flag.allow_killpower` | `0` | 允许killpower |
+| `driver.name` | `usbhid-ups` | 驱动名称 |
+| `driver.parameter.pollfreq` | `30` | 轮询频率 |
+| `driver.parameter.pollinterval` | `5` | 轮询间隔 |
+| `driver.parameter.port` | `auto` | 驱动端口 |
+| `driver.parameter.productid` | `D005` | 产品ID参数 |
+| `driver.parameter.synchronous` | `auto` | 同步模式 |
+| `driver.parameter.vendorid` | `04D8` | 厂商ID参数 |
+| `driver.state` | `quiet` | 驱动状态 |
+| `driver.version` | `2.8.2` | 驱动版本 |
+| `driver.version.data` | `openUPS HID 0.5` | 数据版本 |
+| `driver.version.internal` | `0.53` | 内部驱动版本 |
+| `driver.version.usb` | `libusb-1.0.27 (API: 0x...` | USB库版本 |
+| `input.current` | `1.116` | 输入电流(A) |
+| `input.voltage` | `12.49` | 输入电压(V) |
+| `output.current` | `0.956` | 输出电流(A) |
+| `output.voltage` | `12.49` | 输出电压(V) |
+| `ups.alarm` | `No battery installed!` | UPS报警 |
+| `ups.mfr` | `WL` | UPS制造商 |
+| `ups.model` | `W120` | UPS型号 |
+| `ups.productid` | `d005` | USB产品ID |
+| `ups.serial` | `123456788888` | UPS序列号 |
+| `ups.status` | `ALARM OL` | UPS状态 (OL/OB/LB/HB/RB/CHRG/DISCHRG/BYPASS/CAL/OFF/OVER/TRIM/BOOST/FSD) |
+| `ups.vendorid` | `04d8` | USB厂商ID |
+
+### ❌ 不可用的 NUT 标准变量 (574 个)
 
 <details>
 <summary>点击展开查看不可用变量列表</summary>
 
 
-#### UPS信息 (39 个不可用)
+#### UPS信息 (32 个不可用)
 
 | 变量名 | 描述 |
 |--------|------|
-| `ups.alarm` | UPS报警 |
 | `ups.beeper.status` | 蜂鸣器状态 |
 | `ups.contacts` | 干接点状态 |
 | `ups.date` | UPS内部日期 |
@@ -156,20 +289,15 @@
 | `ups.id` | UPS标识符 |
 | `ups.load` | UPS负载(%) |
 | `ups.load.high` | 高负载阈值(%) |
-| `ups.mfr` | UPS制造商 |
 | `ups.mfr.date` | UPS生产日期 |
-| `ups.model` | UPS型号 |
 | `ups.power` | 视在功率(VA) |
 | `ups.power.nominal` | 额定功率(VA) |
-| `ups.productid` | USB产品ID |
 | `ups.realpower` | 实际功率(W) |
 | `ups.realpower.nominal` | 额定实际功率(W) |
-| `ups.serial` | UPS序列号 |
 | `ups.shutdown` | 关机类型 |
 | `ups.start.auto` | 自动启动 |
 | `ups.start.battery` | 电池冷启动 |
 | `ups.start.reboot` | 自动重启 |
-| `ups.status` | UPS状态 (OL/OB/LB/HB/RB/CHRG/DISCHRG/BYPASS/CAL/OFF/OVER/TRIM/BOOST/FSD) |
 | `ups.temperature` | UPS温度(°C) |
 | `ups.test.date` | 上次自检日期 |
 | `ups.test.interval` | 自检间隔(秒) |
@@ -179,7 +307,6 @@
 | `ups.timer.shutdown` | 关机计时器(秒) |
 | `ups.timer.start` | 启动计时器(秒) |
 | `ups.type` | UPS类型 (offline/line-int/online) |
-| `ups.vendorid` | USB厂商ID |
 | `ups.watchdog.status` | 看门狗状态 |
 
 #### 实验性 (3 个不可用)
@@ -737,42 +864,31 @@
 | `ambient.temperature.low.critical` | 低温临界阈值(°C) |
 | `ambient.temperature.low.warning` | 低温警告阈值(°C) |
 
-#### 电池 (30 个不可用)
+#### 电池 (19 个不可用)
 
 | 变量名 | 描述 |
 |--------|------|
 | `battery.alarm.threshold` | 电池报警阈值 |
-| `battery.capacity` | 电池容量(Ah) |
-| `battery.charge` | 电池电量(%) |
-| `battery.charge.low` | 低电量阈值(%) |
 | `battery.charge.restart` | 重启电量阈值(%) |
-| `battery.charge.warning` | 警告电量阈值(%) |
 | `battery.charger.status` | 充电器状态 |
-| `battery.current` | 电池电流(A) |
 | `battery.current.total` | 电池总电流(A) |
 | `battery.date` | 电池安装日期 |
 | `battery.energysave` | 节能模式状态 |
 | `battery.energysave.delay` | 节能延迟(秒) |
 | `battery.energysave.load` | 节能负载阈值(%) |
 | `battery.energysave.realpower` | 节能功率阈值(W) |
-| `battery.mfr.date` | 电池生产日期 |
 | `battery.packs` | 电池组数量 |
 | `battery.packs.bad` | 损坏电池组数量 |
 | `battery.packs.external` | 外部电池组数量 |
 | `battery.protection` | 电池保护状态 |
-| `battery.runtime` | 剩余运行时间(秒) |
-| `battery.runtime.low` | 低运行时间阈值(秒) |
 | `battery.runtime.restart` | 重启运行时间阈值(秒) |
-| `battery.temperature` | 电池温度(°C) |
-| `battery.type` | 电池类型 |
-| `battery.voltage` | 电池电压(V) |
 | `battery.voltage.cell.max` | 最大电芯电压(V) |
 | `battery.voltage.cell.min` | 最小电芯电压(V) |
 | `battery.voltage.high` | 电池高电压(V) |
 | `battery.voltage.low` | 电池低电压(V) |
 | `battery.voltage.nominal` | 额定电池电压(V) |
 
-#### 设备信息 (11 个不可用)
+#### 设备信息 (7 个不可用)
 
 | 变量名 | 描述 |
 |--------|------|
@@ -781,11 +897,7 @@
 | `device.description` | 设备描述 |
 | `device.location` | 设备位置 |
 | `device.macaddr` | MAC地址 |
-| `device.mfr` | 设备制造商 |
-| `device.model` | 设备型号 |
 | `device.part` | 部件号 |
-| `device.serial` | 设备序列号 |
-| `device.type` | 设备类型 (ups/pdu/scd/psu/ats) |
 | `device.uptime` | 设备运行时间(秒) |
 
 #### 输入L1-L2线 (1 个不可用)
@@ -866,11 +978,10 @@
 | `input.L3.voltage` | L3相输入电压(V) |
 | `input.L3.voltage.status` | L3相电压状态 |
 
-#### 输入电源 (34 个不可用)
+#### 输入电源 (32 个不可用)
 
 | 变量名 | 描述 |
 |--------|------|
-| `input.current` | 输入电流(A) |
 | `input.current.nominal` | 额定输入电流(A) |
 | `input.current.status` | 输入电流状态 |
 | `input.frequency` | 输入频率(Hz) |
@@ -898,7 +1009,6 @@
 | `input.transfer.reason` | 转换原因 |
 | `input.transfer.trim.high` | 降压高阈值(V) |
 | `input.transfer.trim.low` | 降压低阈值(V) |
-| `input.voltage` | 输入电压(V) |
 | `input.voltage.extended` | 扩展输入电压 |
 | `input.voltage.fault` | 故障输入电压(V) |
 | `input.voltage.maximum` | 最大输入电压(V) |
@@ -977,11 +1087,10 @@
 | `output.L3.realpower` | L3相输出实际功率(W) |
 | `output.L3.voltage` | L3相输出电压(V) |
 
-#### 输出电源 (11 个不可用)
+#### 输出电源 (9 个不可用)
 
 | 变量名 | 描述 |
 |--------|------|
-| `output.current` | 输出电流(A) |
 | `output.current.nominal` | 额定输出电流(A) |
 | `output.frequency` | 输出频率(Hz) |
 | `output.frequency.nominal` | 额定输出频率(Hz) |
@@ -990,47 +1099,17 @@
 | `output.power.nominal` | 额定输出功率(VA) |
 | `output.realpower` | 输出实际功率(W) |
 | `output.realpower.nominal` | 额定输出实际功率(W) |
-| `output.voltage` | 输出电压(V) |
 | `output.voltage.nominal` | 额定输出电压(V) |
 
-#### 驱动信息 (4 个不可用)
-
-| 变量名 | 描述 |
-|--------|------|
-| `driver.debug` | 调试级别 |
-| `driver.name` | 驱动名称 |
-| `driver.state` | 驱动状态 |
-| `driver.version` | 驱动版本 |
-
-#### 驱动参数 (11 个不可用)
+#### 驱动参数 (5 个不可用)
 
 | 变量名 | 描述 |
 |--------|------|
 | `driver.parameter.bus` | USB总线 |
 | `driver.parameter.langid_fix` | 语言ID修复 |
-| `driver.parameter.pollfreq` | 轮询频率 |
-| `driver.parameter.pollinterval` | 轮询间隔 |
-| `driver.parameter.port` | 驱动端口 |
 | `driver.parameter.product` | 产品名称 |
-| `driver.parameter.productid` | 产品ID参数 |
 | `driver.parameter.serial` | 序列号参数 |
-| `driver.parameter.synchronous` | 同步模式 |
 | `driver.parameter.vendor` | 厂商名称 |
-| `driver.parameter.vendorid` | 厂商ID参数 |
-
-#### 驱动标志 (1 个不可用)
-
-| 变量名 | 描述 |
-|--------|------|
-| `driver.flag.allow_killpower` | 允许killpower |
-
-#### 驱动版本 (3 个不可用)
-
-| 变量名 | 描述 |
-|--------|------|
-| `driver.version.data` | 数据版本 |
-| `driver.version.internal` | 内部驱动版本 |
-| `driver.version.usb` | USB库版本 |
 
 </details>
 
@@ -1040,36 +1119,24 @@
 | 指标 | 数值 |
 |------|------|
 | 项目定义变量 | 36 |
-| ✅ 可用 | 0 |
-| ❌ 不可用 | 36 |
-| 覆盖率 | 0.0% |
+| ✅ 可用 | 13 |
+| ❌ 不可用 | 23 |
+| 覆盖率 | 36.1% |
 
 #### ❌ 项目中不可用的变量
 
 | 变量名 | 描述 |
 |--------|------|
-| `ups.status` | UPS 状态 (OL=在线, OB=电池, LB=低电) |
-| `ups.model` | UPS 型号 |
-| `ups.mfr` | 制造商 |
-| `battery.charge` | 电池电量 (%) |
-| `battery.runtime` | 剩余运行时间 (秒) |
-| `battery.voltage` | 电池电压 (V) |
 | `battery.voltage.nominal` | 电池额定电压 (V) |
-| `battery.temperature` | 电池温度 (°C) |
-| `battery.type` | 电池类型 |
 | `battery.date` | 电池安装日期 |
-| `battery.mfr.date` | 电池生产日期 |
 | `battery.packs` | 电池组数量 |
 | `battery.packs.bad` | 损坏的电池组数量 |
-| `input.voltage` | 输入电压 (V) |
 | `input.frequency` | 输入频率 (Hz) |
 | `input.voltage.minimum` | 输入电压最小值 (V) |
 | `input.voltage.maximum` | 输入电压最大值 (V) |
 | `input.transfer.low` | 低压转换阈值 (V) |
 | `input.transfer.high` | 高压转换阈值 (V) |
-| `output.voltage` | 输出电压 (V) |
 | `output.frequency` | 输出频率 (Hz) |
-| `output.current` | 输出电流 (A) |
 | `output.current.nominal` | 额定输出电流 (A) |
 | `ups.load` | 负载百分比 (%) |
 | `ups.power.nominal` | UPS 额定功率 (VA) |
@@ -1082,7 +1149,6 @@
 | `ambient.humidity.alarm` | 湿度报警 |
 | `ups.test.result` | 自检结果 |
 | `ups.test.date` | 上次自检时间 |
-| `ups.alarm` | 当前报警信息 |
 | `ups.beeper.status` | 蜂鸣器状态 |
 
 ## 测试总结
@@ -1090,13 +1156,13 @@
 
 | 项目 | 数值 |
 |------|------|
-| UPS 名称 | N/A |
-| 制造商 | N/A |
-| 型号 | N/A |
-| 驱动 | N/A |
-| UPS 提供变量数 | 0 |
+| UPS 名称 | WL W120 |
+| 制造商 | WL |
+| 型号 | W120 |
+| 驱动 | usbhid-ups |
+| UPS 提供变量数 | 43 |
 | NUT 标准变量库 | 614 |
-| 项目变量覆盖率 | 0/36 (0.0%) |
+| 项目变量覆盖率 | 13/36 (36.1%) |
 
 ---
 
@@ -1110,10 +1176,10 @@
 
 | 变量名 | 当前值 | 来源 | 说明 |
 |--------|--------|------|------|
-| `battery.charge.low` | N/A | ⚙️ entrypoint.sh | 低电量阈值(%)，由 `BATTERY_CHARGE_LOW` 环境变量设置 |
-| `battery.runtime.low` | N/A | ⚙️ entrypoint.sh | 低运行时间阈值(秒)，由 `BATTERY_RUNTIME_LOW` 环境变量设置 |
-| `driver.parameter.override.battery.charge.low` | N/A | ⚙️ entrypoint.sh | 记录覆盖值的驱动参数 |
-| `driver.parameter.override.battery.runtime.low` | N/A | ⚙️ entrypoint.sh | 记录覆盖值的驱动参数 |
+| `battery.charge.low` | 20 | ⚙️ entrypoint.sh | 低电量阈值(%)，由 `BATTERY_CHARGE_LOW` 环境变量设置 |
+| `battery.runtime.low` | 180 | ⚙️ entrypoint.sh | 低运行时间阈值(秒)，由 `BATTERY_RUNTIME_LOW` 环境变量设置 |
+| `driver.parameter.override.battery.charge.low` | 20 | ⚙️ entrypoint.sh | 记录覆盖值的驱动参数 |
+| `driver.parameter.override.battery.runtime.low` | 180 | ⚙️ entrypoint.sh | 记录覆盖值的驱动参数 |
 
 ### 驱动配置变量（4个）
 
@@ -1121,19 +1187,19 @@
 
 | 变量名 | 当前值 | 来源 | 说明 |
 |--------|--------|------|------|
-| `driver.flag.ignorelb` | N/A | ⚙️ entrypoint.sh | 忽略 UPS 硬件 LB 信号，使用软件阈值判断 |
-| `driver.parameter.pollinterval` | N/A | ⚙️ entrypoint.sh | USB 轮询间隔，减少通信压力 |
+| `driver.flag.ignorelb` | enabled | ⚙️ entrypoint.sh | 忽略 UPS 硬件 LB 信号，使用软件阈值判断 |
+| `driver.parameter.pollinterval` | 5 | ⚙️ entrypoint.sh | USB 轮询间隔，减少通信压力 |
 | `driver.parameter.subdriver` | N/A | ⚙️ entrypoint.sh | APC 专用子驱动配置 |
-| `driver.parameter.vendorid` | N/A | ⚙️ entrypoint.sh | 从 nut-scanner 提取后写入配置 |
+| `driver.parameter.vendorid` | 04D8 | ⚙️ entrypoint.sh | 从 nut-scanner 提取后写入配置 |
 
 ### 其他驱动参数
 
 | 变量名 | 当前值 | 说明 |
 |--------|--------|------|
-| `driver.parameter.productid` | N/A | USB 产品 ID |
-| `driver.parameter.port` | N/A | 驱动端口 |
-| `driver.parameter.pollfreq` | N/A | 完整轮询频率 |
-| `driver.parameter.synchronous` | N/A | 同步模式 |
+| `driver.parameter.productid` | D005 | USB 产品 ID |
+| `driver.parameter.port` | auto | 驱动端口 |
+| `driver.parameter.pollfreq` | 30 | 完整轮询频率 |
+| `driver.parameter.synchronous` | auto | 同步模式 |
 
 > 💡 **提示**: 如果需要查看 UPS 的原始硬件阈值，可以临时移除 `ups.conf` 中的 `override.*` 和 `ignorelb` 配置后重新测试。
 >
@@ -1149,7 +1215,5 @@
 
 ---
 
-*报告生成完成 - 2026-03-05 19:48:20*
+*报告生成完成 - 2026-03-05 20:27:08*
 
-
-----

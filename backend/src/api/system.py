@@ -1054,6 +1054,7 @@ async def get_monitoring_stats():
     if not monitor:
         return {
             "current_mode": "unknown",
+            "config_mode": "unknown",
             "event_mode_active": False,
             "today_communications": 0,
             "last_update": None,
@@ -1096,6 +1097,7 @@ async def get_monitoring_stats():
     
     return {
         "current_mode": current_mode,
+        "config_mode": config_mode,  # 原始配置模式（polling/event_driven/hybrid），用于前端 CSS class
         "event_mode_active": event_mode_active,
         "today_communications": getattr(monitor, '_communication_count_today', 0),
         "last_update": last_update_iso,

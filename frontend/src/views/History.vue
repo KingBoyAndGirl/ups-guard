@@ -364,7 +364,7 @@
           </div>
           <div class="stat-box">
             <div class="stat-label">当前监控模式</div>
-            <div class="stat-value mode-badge" :class="`mode-${currentMonitoringStats.current_mode || 'unknown'}`">
+            <div class="stat-value mode-badge" :class="`mode-${currentMonitoringStats.config_mode || 'unknown'}`">
               {{ currentMonitoringStats.current_mode || 'Unknown' }}
             </div>
           </div>

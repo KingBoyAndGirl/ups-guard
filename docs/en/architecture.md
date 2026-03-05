@@ -428,7 +428,7 @@ Access: `http://your-host-ip/`
 **LazyCAT Exclusive Features**:
 - In LazyCAT environment, can access via `http://ups-guard.your-host/` (subdomain access)
 - Supports gRPC shutdown (via `/lzcapp/run/sys/lzc-apis.socket`)
-- Supports `lzc-manifest.yml` and `lzc-build.yml` for application packaging
+- Supports `deploy/lazycat/lzc-manifest.yml` and `deploy/lazycat/lzc-build.yml` for application packaging
 
 ### Development Environment
 

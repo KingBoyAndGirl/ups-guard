@@ -15,7 +15,7 @@
 
 ```bash
 git clone https://github.com/KingBoyAndGirl/ups-guard.git
-cd ups-guard
+cd ups-guard/deploy/docker
 ```
 
 ### 2. 配置环境变量
@@ -125,10 +125,12 @@ docker exec ups-guard-nut nut-scanner -U
 
 开发/测试模式使用 Mock 数据，无需连接真实 UPS 设备。
 
-### 1. 创建开发配置
+### 1. 配置 Mock 模式
+
+在 `.env` 文件中设置：
 
 ```bash
-cp docker-compose.override.yml.example docker-compose.override.yml
+MOCK_MODE=true
 ```
 
 ### 2. 启动开发模式
@@ -137,14 +139,11 @@ cp docker-compose.override.yml.example docker-compose.override.yml
 docker-compose up -d
 ```
 
-Docker Compose 会自动合并 `docker-compose.yml` 和 `docker-compose.override.yml`，启用 Mock 模式。
-
 ### 3. 开发模式特性
 
-- 使用 `dummy-ups` 驱动（不需要真实 UPS）
-- 后端使用 Mock 数据
-- 前端支持热重载（修改代码自动刷新）
+- 后端使用模拟 UPS 数据（无需真实 UPS 设备）
 - 详细日志输出（LOG_LEVEL=DEBUG）
+- 适用于开发调试和功能体验
 
 ## 纳管设备配置
 
@@ -302,4 +301,4 @@ docker rmi $(docker images | grep ups-guard | awk '{print $3}')
 
 ## 许可证
 
-本项目采用 GPL-3.0 许可证。详见 [LICENSE](../LICENSE) 文件。
+本项目采用 AGPL-3.0 许可证。详见 [LICENSE](../../LICENSE) 文件。

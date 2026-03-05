@@ -78,7 +78,7 @@ UPS Guard 支持在任意有 Docker 的设备上运行，可通过 USB 连接 UP
 ```bash
 # 1. 克隆仓库
 git clone https://github.com/KingBoyAndGirl/ups-guard.git
-cd ups-guard
+cd ups-guard/deploy/docker
 
 # 2. 配置环境变量
 cp .env.example .env

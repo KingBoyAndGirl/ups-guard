@@ -15,7 +15,7 @@ This document describes how to deploy UPS Guard system using Docker Compose on a
 
 ```bash
 git clone https://github.com/KingBoyAndGirl/ups-guard.git
-cd ups-guard
+cd ups-guard/deploy/docker
 ```
 
 ### 2. Configure Environment Variables
@@ -125,10 +125,12 @@ Modify `UPS_DRIVER` in `.env` based on output.
 
 Development/test mode uses Mock data, no need to connect real UPS device.
 
-### 1. Create Development Configuration
+### 1. Configure Mock Mode
+
+Set in `.env` file:
 
 ```bash
-cp docker-compose.override.yml.example docker-compose.override.yml
+MOCK_MODE=true
 ```
 
 ### 2. Start Development Mode
@@ -137,14 +139,11 @@ cp docker-compose.override.yml.example docker-compose.override.yml
 docker-compose up -d
 ```
 
-Docker Compose will automatically merge `docker-compose.yml` and `docker-compose.override.yml`, enabling Mock mode.
-
 ### 3. Development Mode Features
 
-- Uses `dummy-ups` driver (no real UPS needed)
-- Backend uses Mock data
-- Frontend supports hot reload (auto-refresh on code change)
+- Backend uses simulated UPS data (no real UPS device needed)
 - Detailed log output (LOG_LEVEL=DEBUG)
+- Suitable for development debugging and feature exploration
 
 ## Managed Devices Configuration
 
@@ -302,4 +301,4 @@ docker rmi $(docker images | grep ups-guard | awk '{print $3}')
 
 ## License
 
-This project uses GPL-3.0 license. See [LICENSE](../LICENSE) file for details.
+This project uses AGPL-3.0 license. See [LICENSE](../../LICENSE) file for details.

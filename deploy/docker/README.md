@@ -77,6 +77,5 @@ docker-compose exec nut-server upsc <发现的UPS名称>@localhost
 ## 文件说明
 
 - `docker-compose.yml` - 主编排文件
-- `docker-compose.override.yml.example` - 自定义覆盖示例
 - `.env.example` - 环境变量模板
 

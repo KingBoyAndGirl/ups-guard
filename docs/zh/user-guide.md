@@ -32,8 +32,8 @@
    ```
 
 2. **访问界面**
-   - 打开浏览器访问：`http://YOUR_IP:8080`
-   - 默认无需认证（可在设置中开启）
+   - 打开浏览器访问：`http://YOUR_IP`（默认端口 80，可在 `.env` 中修改 `HTTP_PORT`）
+   - 首次访问需要 API Token（首次启动后查看容器日志获取）
 
 3. **配置 UPS**
    - 进入"设置"页面
@@ -61,7 +61,7 @@
 ```bash
 # 克隆项目
 git clone https://github.com/KingBoyAndGirl/ups-guard.git
-cd ups-guard
+cd ups-guard/deploy/docker
 
 # 启动服务
 docker-compose up -d
@@ -76,7 +76,7 @@ docker-compose logs -f backend
 - `frontend`：Nginx 前端
 
 **端口映射**：
-- `8080`：Web 界面
+- `80`：Web 界面（默认，可通过 `HTTP_PORT` 环境变量修改）
 - `3493`：NUT 服务器（供其他设备连接）
 
 ### 方式二：懒猫微服部署
@@ -84,7 +84,7 @@ docker-compose logs -f backend
 **适用场景**：懒猫微服（LazyCAT）环境
 
 1. 将项目打包为懒猫应用
-2. 使用 `lzc-build.yml` 构建镜像
+2. 使用 `deploy/lazycat/lzc-build.yml` 构建镜像
 3. 通过懒猫应用商店安装
 
 **优势**：
@@ -99,15 +99,15 @@ docker-compose logs -f backend
 ```bash
 # 安装依赖（使用 uv）
 cd backend
-uv pip install -e .
+uv sync
 
 # 启动后端
 python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 
 # 启动前端（另一个终端）
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ---

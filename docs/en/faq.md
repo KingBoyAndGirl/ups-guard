@@ -363,7 +363,7 @@ A: If you want to:
 - Not disclose source code
 - Get technical support
 
-Please contact us for commercial authorization. See [Commercial License Agreement](../COMMERCIAL_LICENSE.md) for details.
+Please contact us for commercial authorization. See [Commercial License Agreement](../../COMMERCIAL_LICENSE.md) for details.
 
 ### Q: How to get technical support?
 

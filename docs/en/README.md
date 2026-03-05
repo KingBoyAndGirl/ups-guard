@@ -66,7 +66,7 @@ Runs on any device with Docker (Win11, Mac, Linux, Synology, QNAP, etc.).
 ```bash
 # 1. Clone repository
 git clone https://github.com/KingBoyAndGirl/ups-guard.git
-cd ups-guard
+cd ups-guard/deploy/docker
 
 # 2. Configure environment variables
 cp .env.example .env

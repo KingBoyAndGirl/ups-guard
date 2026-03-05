@@ -30,8 +30,8 @@ Welcome to **UPS Guard**! This is an intelligent UPS power management system tha
    ```
 
 2. **Access Interface**
-   - Open browser and visit: `http://YOUR_IP:8080`
-   - No authentication required by default (can be enabled in settings)
+   - Open browser and visit: `http://YOUR_IP` (default port 80, configurable via `HTTP_PORT` in `.env`)
+   - API Token required on first access (check container logs after first startup)
 
 3. **Configure UPS**
    - Go to "Settings" page
@@ -59,7 +59,7 @@ Welcome to **UPS Guard**! This is an intelligent UPS power management system tha
 ```bash
 # Clone project
 git clone https://github.com/KingBoyAndGirl/ups-guard.git
-cd ups-guard
+cd ups-guard/deploy/docker
 
 # Start services
 docker-compose up -d
@@ -74,7 +74,7 @@ docker-compose logs -f backend
 - `frontend`: Nginx frontend
 
 **Port Mapping**:
-- `8080`: Web interface
+- `80`: Web interface (default, configurable via `HTTP_PORT` environment variable)
 - `3493`: NUT server (for other devices to connect)
 
 ### Method 2: LazyCAT Deployment
@@ -82,7 +82,7 @@ docker-compose logs -f backend
 **Use Case**: LazyCAT environment
 
 1. Package project as LazyCAT application
-2. Build image using `lzc-build.yml`
+2. Build image using `deploy/lazycat/lzc-build.yml`
 3. Install via LazyCAT App Store
 
 **Advantages**:
@@ -97,15 +97,15 @@ docker-compose logs -f backend
 ```bash
 # Install dependencies (using uv)
 cd backend
-uv pip install -e .
+uv sync
 
 # Start backend
 python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 
 # Start frontend (another terminal)
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ---

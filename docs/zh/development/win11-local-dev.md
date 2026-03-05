@@ -705,19 +705,18 @@ docker-compose up -d --build
 
 ### 7.5 热重载开发模式
 
-如需频繁修改代码，可以使用开发模式：
+如需频繁修改代码，可以使用 Mock 模式：
 
 ```powershell
-# 复制开发配置
-Copy-Item docker-compose.override.yml.example docker-compose.override.yml
+# 在 .env 中设置 Mock 模式
+# 编辑 .env，设置 MOCK_MODE=true
 
-# 启动（会自动合并配置）
+# 启动（无需真实 UPS 设备）
 docker-compose up -d
 ```
 
 开发模式特性：
-- 后端代码修改后自动重载
-- 前端支持热更新
+- 使用模拟 UPS 数据（无需真实 UPS 设备）
 - 详细 DEBUG 日志
 
 ---

@@ -428,7 +428,7 @@ services:
 **懒猫微服专有特性**：
 - 在懒猫微服环境中，可通过 `http://ups-guard.your-host/` 访问（子域名访问）
 - 支持 gRPC 关机（通过 `/lzcapp/run/sys/lzc-apis.socket`）
-- 支持 `lzc-manifest.yml` 和 `lzc-build.yml` 进行应用打包
+- 支持 `deploy/lazycat/lzc-manifest.yml` 和 `deploy/lazycat/lzc-build.yml` 进行应用打包
 
 ### 开发环境
 

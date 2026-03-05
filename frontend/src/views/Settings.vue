@@ -561,14 +561,15 @@
             >
               <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
               <h3 class="card-title">🔧 UPS 高级配置</h3>
-              <p class="help-text" style="margin-bottom: 1rem;">直接修改 UPS 硬件参数，修改后自动保存</p>
+              <p class="help-text" style="margin-bottom: 0.5rem;">直接修改 UPS 硬件参数，修改后自动保存</p>
+              <p class="help-text reference-note" style="margin-bottom: 1rem;">💡 默认值仅供参考，基于 APC Back-UPS BK650M2_CH 出厂设置，实际默认值请以您的 UPS 型号为准</p>
               <div class="ups-advanced-section">
                 <h4 class="section-title">⚡ 电压保护配置</h4>
                 <div class="form-group">
                   <label class="form-label">高压切换阈值（V）</label>
                   <div class="value-comparison">
                     <div class="current-value"><span class="label">当前值：</span><span class="value">{{ currentVoltageHigh || '-' }}</span></div>
-                    <div class="default-value"><span class="label">默认值：</span><span class="value">{{ UPS_PARAM_DEFAULTS['input.transfer.high'] }} V</span></div>
+                    <div class="default-value"><span class="label">参考值：</span><span class="value">{{ UPS_PARAM_DEFAULTS['input.transfer.high'] }} V</span></div>
                     <input v-model.number="newVoltageHigh" type="number" :min="VOLTAGE_LIMITS.HIGH_MIN" :max="VOLTAGE_LIMITS.HIGH_MAX" class="form-control" :placeholder="`${VOLTAGE_LIMITS.HIGH_MIN}-${VOLTAGE_LIMITS.HIGH_MAX}`" @change="onVoltageChange"/>
                   </div>
                 </div>
@@ -576,7 +577,7 @@
                   <label class="form-label">低压切换阈值（V）</label>
                   <div class="value-comparison">
                     <div class="current-value"><span class="label">当前值：</span><span class="value">{{ currentVoltageLow || '-' }}</span></div>
-                    <div class="default-value"><span class="label">默认值：</span><span class="value">{{ UPS_PARAM_DEFAULTS['input.transfer.low'] }} V</span></div>
+                    <div class="default-value"><span class="label">参考值：</span><span class="value">{{ UPS_PARAM_DEFAULTS['input.transfer.low'] }} V</span></div>
                     <input v-model.number="newVoltageLow" type="number" :min="VOLTAGE_LIMITS.LOW_MIN" :max="VOLTAGE_LIMITS.LOW_MAX" class="form-control" :placeholder="`${VOLTAGE_LIMITS.LOW_MIN}-${VOLTAGE_LIMITS.LOW_MAX}`" @change="onVoltageChange"/>
                   </div>
                 </div>
@@ -587,10 +588,10 @@
                 <div class="form-group">
                   <label class="form-label">输入灵敏度</label>
                   <div class="current-value" style="margin-bottom: 0.5rem;"><span class="label">当前值：</span><span class="value">{{ currentSensitivity || '-' }}</span></div>
-                  <div class="default-value" style="margin-bottom: 0.5rem;"><span class="label">默认值：</span><span class="value">{{ UPS_PARAM_DEFAULTS['input.sensitivity'] }} (Low - UPS出厂值)</span></div>
+                  <div class="default-value" style="margin-bottom: 0.5rem;"><span class="label">参考值：</span><span class="value">{{ UPS_PARAM_DEFAULTS['input.sensitivity'] }} (Low)</span></div>
                   <select v-model="newSensitivity" class="form-control" @change="onSensitivityChange">
                     <option value="">-- 选择灵敏度 --</option>
-                    <option value="low">低 (Low) - APC出厂默认</option>
+                    <option value="low">低 (Low)</option>
                     <option value="medium">中 (Medium)</option>
                     <option value="high">高 (High)</option>
                   </select>
@@ -603,7 +604,7 @@
                   <label class="form-label">关机延迟时间（秒）</label>
                   <div class="value-comparison">
                     <div class="current-value"><span class="label">当前值：</span><span class="value">{{ currentShutdownDelay || '-' }}</span></div>
-                    <div class="default-value"><span class="label">默认值：</span><span class="value">{{ UPS_PARAM_DEFAULTS['ups.delay.shutdown'] }} 秒</span></div>
+                    <div class="default-value"><span class="label">参考值：</span><span class="value">{{ UPS_PARAM_DEFAULTS['ups.delay.shutdown'] }} 秒</span></div>
                     <input v-model.number="newShutdownDelay" type="number" :min="SHUTDOWN_DELAY_LIMITS.MIN" :max="SHUTDOWN_DELAY_LIMITS.MAX" class="form-control" @change="onShutdownDelayChange"/>
                   </div>
                 </div>
@@ -1325,12 +1326,12 @@ const VOLTAGE_LIMITS = {
   LOW_MAX: 200
 }
 
-// UPS参数默认值（基于APC Back-UPS BK650M2_CH实际出厂设置）
+// UPS参数参考值（基于APC Back-UPS BK650M2_CH出厂设置，仅供参考）
 const UPS_PARAM_DEFAULTS = {
-  'input.transfer.high': '278',  // 高压切换阈值默认值（实际UPS出厂值）
-  'input.transfer.low': '160',   // 低压切换阈值默认值
-  'input.sensitivity': 'low',    // 灵敏度默认值（实际UPS出厂值：低）
-  'ups.delay.shutdown': '20'     // 关机延迟默认值
+  'input.transfer.high': '278',  // 高压切换阈值参考值
+  'input.transfer.low': '160',   // 低压切换阈值参考值
+  'input.sensitivity': 'low',    // 灵敏度参考值
+  'ups.delay.shutdown': '20'     // 关机延迟参考值
 }
 
 const SHUTDOWN_DELAY_LIMITS = {
@@ -2771,6 +2772,15 @@ watch(
   font-size: 0.875rem;
   margin-top: 0.25rem;
   display: block;
+}
+
+.help-text.reference-note {
+  color: #f59e0b;
+  font-size: 0.8rem;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
 }
 
 .help-text.warning-text {

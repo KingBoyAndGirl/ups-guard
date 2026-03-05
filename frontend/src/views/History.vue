@@ -399,7 +399,7 @@
                 <td>{{ stat.date }}</td>
                 <td>
                   <span class="mode-badge-small" :class="`mode-${stat.monitoring_mode || 'unknown'}`">
-                    {{ stat.monitoring_mode || 'N/A' }}
+                    {{ getModeName(stat.monitoring_mode) }}
                   </span>
                 </td>
                 <td>
@@ -548,6 +548,17 @@ const getResultText = (result: string) => {
     'unknown': '未知',
   }
   return texts[result] || '未知'
+}
+
+// 获取监控模式中文名称
+const getModeName = (mode: string | null): string => {
+  if (!mode) return 'N/A'
+  const modeLabels: Record<string, string> = {
+    'polling': '轮询模式',
+    'event_driven': '事件驱动',
+    'hybrid': '混合模式',
+  }
+  return modeLabels[mode] || mode
 }
 
 // 格式化时间

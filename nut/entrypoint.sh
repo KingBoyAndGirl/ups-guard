@@ -129,7 +129,7 @@ if command -v nut-scanner &> /dev/null; then
                     RECOMMENDED_DRIVER="blazer_usb"
                     ;;
                 "0665")
-                    UPS_BRAND="CyberPower"
+                    UPS_BRAND="CyberPower/Ladis"
                     AUTO_BRAND="CyberPower"
                     RECOMMENDED_DRIVER="usbhid-ups"
                     ;;
@@ -141,6 +141,11 @@ if command -v nut-scanner &> /dev/null; then
                 "06da")
                     UPS_BRAND="伊顿 (Eaton)"
                     AUTO_BRAND="Eaton"
+                    RECOMMENDED_DRIVER="usbhid-ups"
+                    ;;
+                "04d8")
+                    UPS_BRAND="瓦力方程 (Wali)"
+                    AUTO_BRAND="Wali"
                     RECOMMENDED_DRIVER="usbhid-ups"
                     ;;
                 "0001")
@@ -187,7 +192,21 @@ BRAND_EOF
             
             if [ -n "$DETECTED_DRIVER" ]; then
                 echo "Detected driver: $DETECTED_DRIVER"
-                UPS_DRIVER=$DETECTED_DRIVER
+
+                # 驱动选择策略：品牌推荐优先
+                # 当品牌映射表有推荐驱动且与 nut-scanner 检测结果不同时，优先使用品牌推荐
+                if [ -n "$RECOMMENDED_DRIVER" ] && [ "$DETECTED_DRIVER" != "$RECOMMENDED_DRIVER" ]; then
+                    echo "⚠️  nut-scanner 推荐驱动 '${DETECTED_DRIVER}' 与品牌推荐驱动 '${RECOMMENDED_DRIVER}' 不同"
+                    echo "   优先使用品牌推荐驱动: ${RECOMMENDED_DRIVER}"
+                    echo "   (如品牌推荐驱动失败，monitor 将自动回退尝试其他驱动)"
+                    UPS_DRIVER=$RECOMMENDED_DRIVER
+                    # 将 nut-scanner 的推荐保存为备用驱动（供回退使用）
+                    FALLBACK_SCANNER_DRIVER=$DETECTED_DRIVER
+                else
+                    UPS_DRIVER=$DETECTED_DRIVER
+                    FALLBACK_SCANNER_DRIVER=""
+                fi
+
                 if [ -n "$DETECTED_PORT" ]; then
                     echo "Detected port: $DETECTED_PORT"
                     UPS_PORT=$DETECTED_PORT
@@ -396,7 +415,7 @@ echo "  USB 设备检查"
 echo "═══════════════════════════════════════"
 if command -v lsusb &> /dev/null; then
     echo "lsusb 输出:"
-    lsusb 2>/dev/null | grep -i "ups\|apc\|cyber\|eaton\|051d\|0665\|06da" || echo "  (未找到已知 UPS 设备)"
+    lsusb 2>/dev/null | grep -i "ups\|apc\|cyber\|eaton\|wali\|ladis\|santak\|04d8\|051d\|0665\|06da\|0463\|0764" || echo "  (未找到已知 UPS 设备)"
 else
     echo "lsusb 不可用，检查 /dev/bus/usb:"
     ls -la /dev/bus/usb/ 2>/dev/null || echo "  /dev/bus/usb 不存在"
@@ -544,9 +563,10 @@ monitor_ups_driver() {
                     case "$vendor_lower" in
                         "051d") new_brand="APC" ;;
                         "0463") new_brand="SANTAK" ;;
-                        "0665") new_brand="CyberPower" ;;
+                        "0665") new_brand="CyberPower" ;;  # 包含 Ladis
                         "0764") new_brand="Huawei" ;;
                         "06da") new_brand="Eaton" ;;
+                        "04d8") new_brand="Wali" ;;
                     esac
 
                     # 生成新的 UPS 名称
@@ -720,9 +740,10 @@ SWITCH_EOF
                     case "$(echo "$new_vendor" | tr '[:upper:]' '[:lower:]')" in
                         "051d") new_brand="APC" ;;
                         "0463") new_brand="SANTAK" ;;
-                        "0665") new_brand="CyberPower" ;;
+                        "0665") new_brand="CyberPower" ;;  # 包含 Ladis
                         "0764") new_brand="Huawei" ;;
                         "06da") new_brand="Eaton" ;;
+                        "04d8") new_brand="Wali" ;;
                     esac
 
                     # 生成 UPS 名称
@@ -998,9 +1019,10 @@ DUMMY_WAIT_EOF
                 case "$vendor_lower" in
                     "051d") new_brand="APC" ;;
                     "0463") new_brand="SANTAK" ;;
-                    "0665") new_brand="CyberPower" ;;
+                    "0665") new_brand="CyberPower" ;;  # 包含 Ladis
                     "0764") new_brand="Huawei" ;;
                     "06da") new_brand="Eaton" ;;
+                    "04d8") new_brand="Wali" ;;
                 esac
 
                 # 生成新的 UPS 名称
@@ -1098,11 +1120,20 @@ MONITOR_EOF
                         # 根据 VID 确定推荐驱动
                         local fallback_driver=""
                         case "$found_vendor" in
-                            "0665") fallback_driver="usbhid-ups" ;;   # CyberPower
+                            "0665") fallback_driver="usbhid-ups" ;;   # CyberPower/Ladis
                             "051d") fallback_driver="usbhid-ups" ;;   # APC
                             "06da") fallback_driver="usbhid-ups" ;;   # Eaton/Phoenixtec
+                            "04d8") fallback_driver="usbhid-ups" ;;   # 瓦力方程 (Microchip VID)
                             *)      fallback_driver="usbhid-ups" ;;   # 默认回退
                         esac
+
+                        # 如果品牌推荐的回退驱动与当前驱动相同，
+                        # 尝试使用 nut-scanner 之前推荐的驱动作为二次回退
+                        local scanner_fallback="${FALLBACK_SCANNER_DRIVER:-}"
+                        if [ "$found_driver" = "$fallback_driver" ] && [ -n "$scanner_fallback" ] && [ "$scanner_fallback" != "$found_driver" ]; then
+                            echo "$(date): 🔄 品牌推荐驱动 '${fallback_driver}' 与当前驱动相同，尝试 nut-scanner 推荐的 '${scanner_fallback}'"
+                            fallback_driver="$scanner_fallback"
+                        fi
 
                         if [ "$found_driver" != "$fallback_driver" ]; then
                             echo "$(date): 🔄 驱动 '${found_driver}' 连续失败 ${driver_fail_count} 次，回退到推荐驱动 '${fallback_driver}'"

@@ -111,23 +111,45 @@ def _send_packet(magic_packet: bytes, broadcast_address: str, port: int):
         sock.close()
 
 
+# AC/DC 电压判断阈值：低于此值认为是 DC UPS
+AC_DC_VOLTAGE_THRESHOLD = 48.0
+
+# 不同电压类型的默认范围
+VOLTAGE_RANGES = {
+    "ac": {"min": 190.0, "max": 250.0, "label": "AC"},
+    "dc": {"min": 10.0, "max": 30.0, "label": "DC"},
+}
+
+
+def _detect_voltage_type(voltage: float) -> str:
+    """根据电压值自动检测 AC/DC 类型
+
+    Args:
+        voltage: 输入电压值
+
+    Returns:
+        "ac" 或 "dc"
+    """
+    return "dc" if voltage < AC_DC_VOLTAGE_THRESHOLD else "ac"
+
+
 async def check_voltage_stable(
     monitor: Optional['UpsMonitor'],
     checks: int = 3,
     interval: int = 5,
-    min_voltage: float = 190,
-    max_voltage: float = 250
+    min_voltage: float = None,
+    max_voltage: float = None
 ) -> bool:
     """
-    检查输入电压是否稳定
-    
+    检查输入电压是否稳定（自动适配 AC/DC UPS）
+
     Args:
         monitor: UPS 监控器实例（用于读取 UPS 数据）
         checks: 连续检查次数，默认 3 次
         interval: 每次检查间隔（秒），默认 5 秒
-        min_voltage: 最小可接受电压，默认 190V
-        max_voltage: 最大可接受电压，默认 250V
-    
+        min_voltage: 最小可接受电压（None 则自动检测）
+        max_voltage: 最大可接受电压（None 则自动检测）
+
     Returns:
         电压是否稳定（连续 checks 次都在正常范围内）
     """
@@ -136,7 +158,8 @@ async def check_voltage_stable(
         return True
     
     stable_count = 0
-    
+    detected_type = None
+
     for i in range(checks):
         try:
             ups_data = await monitor.get_current_status()
@@ -144,12 +167,33 @@ async def check_voltage_stable(
             if ups_data and ups_data.input_voltage:
                 voltage = ups_data.input_voltage
                 
-                if min_voltage <= voltage <= max_voltage:
+                # 首次检测时确定电压类型和范围
+                if min_voltage is None or max_voltage is None:
+                    detected_type = _detect_voltage_type(voltage)
+                    vrange = VOLTAGE_RANGES[detected_type]
+                    actual_min = min_voltage if min_voltage is not None else vrange["min"]
+                    actual_max = max_voltage if max_voltage is not None else vrange["max"]
+                    if i == 0:
+                        logger.info(
+                            f"Auto-detected {vrange['label']} UPS, "
+                            f"voltage range: {actual_min}V-{actual_max}V"
+                        )
+                else:
+                    actual_min = min_voltage
+                    actual_max = max_voltage
+
+                if actual_min <= voltage <= actual_max:
                     stable_count += 1
-                    logger.debug(f"Voltage check {i+1}/{checks}: {voltage}V - OK (stable count: {stable_count})")
+                    logger.debug(
+                        f"Voltage check {i+1}/{checks}: {voltage}V - OK "
+                        f"(stable count: {stable_count})"
+                    )
                 else:
                     stable_count = 0
-                    logger.warning(f"Voltage check {i+1}/{checks}: {voltage}V - Out of range [{min_voltage}V-{max_voltage}V]")
+                    logger.warning(
+                        f"Voltage check {i+1}/{checks}: {voltage}V - "
+                        f"Out of range [{actual_min}V-{actual_max}V]"
+                    )
             else:
                 logger.warning(f"Voltage check {i+1}/{checks}: No voltage data available")
                 stable_count = 0

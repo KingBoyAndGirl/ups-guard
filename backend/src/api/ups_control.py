@@ -657,20 +657,22 @@ async def get_test_report_by_id(report_id: int):
 
 
 # 可写变量安全白名单
-# 基于 APC Back-UPS BK650M2_CH 规格，电压限制可能需要根据不同型号/地区调整
+# 注意: 电压范围需要同时兼容 AC UPS (110-300V) 和 DC UPS (5-48V)
+# 不同型号的 UPS 通过 NUT 的 LIST RW 接口暴露的变量不同
+# 只有设备实际暴露的变量才会显示在前端
 ALLOWED_SET_VARS = {
     "input.transfer.high": {
         "description": "高压切换阈值 (V)",
         "type": "number",
-        "min": 220,
-        "max": 300,
+        "min": 5,       # 兼容 DC UPS (如 W150 12V~24V)
+        "max": 300,     # 兼容 AC UPS (如 APC 220V~300V)
         "unit": "V",
     },
     "input.transfer.low": {
         "description": "低压切换阈值 (V)",
         "type": "number",
-        "min": 100,
-        "max": 200,
+        "min": 1,       # 兼容 DC UPS
+        "max": 200,     # 兼容 AC UPS
         "unit": "V",
     },
     "input.sensitivity": {
@@ -686,6 +688,21 @@ ALLOWED_SET_VARS = {
         "min": 0,
         "max": 600,
         "unit": "秒",
+    },
+    # DC UPS 扩展变量（W150 等可能暴露）
+    "output.voltage.nominal": {
+        "description": "额定输出电压 (V)",
+        "type": "number",
+        "min": 5,
+        "max": 48,
+        "unit": "V",
+    },
+    "output.current.nominal": {
+        "description": "额定输出电流 (A)",
+        "type": "number",
+        "min": 0.5,
+        "max": 20,
+        "unit": "A",
     },
 }
 

@@ -902,9 +902,12 @@
                     <span class="edit-icon">✏️</span>
                   </span>
                 </div>
-                <div class="voltage-info-row" v-if="upsData.input_voltage_nominal">
+                <div class="voltage-info-row" v-if="upsData.input_voltage_nominal || inferredNominalVoltage">
                   <span class="voltage-label">额定电压</span>
-                  <span class="voltage-value-small">{{ upsData.input_voltage_nominal }} V</span>
+                  <span class="voltage-value-small">
+                    {{ upsData.input_voltage_nominal || inferredNominalVoltage }} V
+                    <span v-if="!upsData.input_voltage_nominal && inferredNominalVoltage" class="voltage-inferred">(推断)</span>
+                  </span>
                 </div>
                 <div class="voltage-info-row" v-if="upsData.input_transfer_reason">
                   <span class="voltage-label">切换原因</span>
@@ -1845,6 +1848,28 @@ const sparklineColor = computed(() => {
 
 const latestBatteryCharge = computed(() => {
   return upsData.value?.battery_charge ?? 0
+})
+
+// AC/DC 电压判断阈值：低于此值认为是 DC UPS
+const AC_DC_VOLTAGE_THRESHOLD = 48
+
+// 推断额定电压（当 UPS 不报告 input.voltage.nominal 时）
+const inferredNominalVoltage = computed(() => {
+  // UPS 已报告额定电压，不需要推断
+  if (upsData.value?.input_voltage_nominal) return null
+
+  const voltage = upsData.value?.input_voltage
+  if (!voltage) return null
+
+  // DC UPS 常见额定电压推断
+  if (voltage < AC_DC_VOLTAGE_THRESHOLD) {
+    if (voltage >= 10 && voltage <= 14) return 12   // 12V DC UPS
+    if (voltage >= 18 && voltage <= 21) return 19   // 19V DC UPS (笔记本)
+    if (voltage >= 22 && voltage <= 26) return 24   // 24V DC UPS
+    return null
+  }
+  // AC UPS 默认 220V
+  return 220
 })
 
 // Phase 1 新增计算属性
@@ -5221,6 +5246,13 @@ watch(latestHookProgress, (progress) => {
 .voltage-value-small {
   font-size: 0.8125rem;
   color: var(--text-primary);
+}
+
+.voltage-inferred {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  font-weight: normal;
+  margin-left: 0.25rem;
 }
 
 .voltage-good { color: #10B981; }

@@ -409,6 +409,77 @@ chmod 770 /var/run/nut
 
 echo "Starting UPS driver..."
 
+# ========== USB 设备清理 ==========
+# 某些情况下（容器重启、驱动异常退出），内核驱动（usbfs/usbhid）可能
+# 残留 claim，导致 NUT 驱动无法获取设备。
+# 通过 sysfs 进行 unbind 来释放残留。
+echo "Cleaning up USB device claims..."
+cleanup_usb_claims() {
+    local cleaned=0
+    # 遍历所有 USB interface
+    for intf in /sys/bus/usb/devices/*/driver; do
+        if [ -L "$intf" ]; then
+            local driver_name
+            driver_name=$(basename "$(readlink "$intf")")
+            local intf_id
+            intf_id=$(basename "$(dirname "$intf")")
+
+            # 只清理 usbfs 残留（容器进程退出后留下的 claim）
+            if [ "$driver_name" = "usbfs" ]; then
+                echo "  Unbinding stale usbfs claim on $intf_id"
+                echo "$intf_id" > /sys/bus/usb/drivers/usbfs/unbind 2>/dev/null && {
+                    echo "  ✅ Unbound $intf_id from usbfs"
+                    cleaned=$((cleaned + 1))
+                } || {
+                    echo "  ⚠️ Failed to unbind $intf_id (may require host privileges)"
+                }
+            fi
+        fi
+    done
+
+    if [ $cleaned -eq 0 ]; then
+        echo "  No stale USB claims found"
+    else
+        echo "  Cleaned up $cleaned stale USB claim(s), waiting for device re-enumeration..."
+        sleep 2
+    fi
+}
+cleanup_usb_claims
+echo ""
+
+# ========== USB 设备权限修复 ==========
+# 确保所有 USB 设备节点对 NUT 驱动可访问
+# 某些容器环境中设备权限可能不足（即使 privileged 模式下）
+echo "Fixing USB device permissions..."
+fix_usb_permissions() {
+    local fixed=0
+    for bus_dir in /dev/bus/usb/*/; do
+        if [ -d "$bus_dir" ]; then
+            for dev_file in "${bus_dir}"*; do
+                if [ -c "$dev_file" ]; then
+                    local current_perms
+                    current_perms=$(stat -c '%a' "$dev_file" 2>/dev/null)
+                    if [ "$current_perms" != "666" ] && [ "$current_perms" != "777" ]; then
+                        chmod 666 "$dev_file" 2>/dev/null && {
+                            fixed=$((fixed + 1))
+                            log_debug "  Fixed: $dev_file ($current_perms -> 666)"
+                        } || {
+                            log_debug "  ⚠️ Cannot chmod $dev_file (current: $current_perms)"
+                        }
+                    fi
+                fi
+            done
+        fi
+    done
+    if [ $fixed -gt 0 ]; then
+        echo "  Fixed permissions on $fixed USB device(s)"
+    else
+        echo "  All USB device permissions OK"
+    fi
+}
+fix_usb_permissions
+echo ""
+
 # 显示 USB 设备信息（调试用）
 echo "═══════════════════════════════════════"
 echo "  USB 设备检查"

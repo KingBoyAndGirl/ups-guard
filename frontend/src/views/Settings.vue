@@ -1319,17 +1319,21 @@ const channelTestResult = ref<{ success: boolean; message: string } | null>(null
 const channelErrors = ref<Record<number, string>>({})  // 渠道错误状态
 
 // UPS 高级配置相关
+// 电压限制 - 同时兼容 AC UPS (110-300V) 和 DC UPS (5-48V)
+// 后端会根据 UPS 实际暴露的可写变量和白名单进行验证
 const VOLTAGE_LIMITS = {
-  HIGH_MIN: 220,
-  HIGH_MAX: 300,
-  LOW_MIN: 100,
-  LOW_MAX: 200
+  HIGH_MIN: 5,     // 兼容 DC UPS
+  HIGH_MAX: 300,   // 兼容 AC UPS
+  LOW_MIN: 1,      // 兼容 DC UPS
+  LOW_MAX: 200     // 兼容 AC UPS
 }
 
-// UPS参数参考值（基于APC Back-UPS BK650M2_CH出厂设置，仅供参考）
+// UPS参数参考值
+// 注意：这些是 AC UPS (APC Back-UPS BK650M2_CH) 的参考值
+// DC UPS (如瓦力 W120/W150) 的参考值会完全不同
 const UPS_PARAM_DEFAULTS = {
-  'input.transfer.high': '278',  // 高压切换阈值参考值
-  'input.transfer.low': '160',   // 低压切换阈值参考值
+  'input.transfer.high': '278',  // AC UPS 高压切换阈值参考值
+  'input.transfer.low': '160',   // AC UPS 低压切换阈值参考值
   'input.sensitivity': 'low',    // 灵敏度参考值
   'ups.delay.shutdown': '20'     // 关机延迟参考值
 }

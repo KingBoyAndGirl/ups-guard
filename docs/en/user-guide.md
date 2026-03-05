@@ -486,7 +486,7 @@ If UPS Guard and target device are on different subnets, configure directed broa
 - Device must be completely shutdown, sleep/hibernate may not respond to WOL
 - If wake fails, check BIOS WOL settings and network connection
 - Auto wake-up checks voltage stability first (3 consecutive checks, 5-second interval)
-- WOL packets are only sent when voltage is stable in 190V-250V range
+- Voltage stability check auto-adapts to AC/DC UPS: AC UPS checks 190V-250V, DC UPS (e.g., Wali W120) checks 10V-30V
 
 #### 7. WOL Test Communication Flow Detailed Guide
 

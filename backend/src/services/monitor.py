@@ -482,11 +482,24 @@ class UpsMonitor:
             # 解析状态标志位列表
             status_flags = status_str.split() if status_str else []
 
+            # 获取原始告警信息
+            raw_alarm = vars_dict.get("ups.alarm")
+
+            # 过滤已知的固件误报告警
+            # W120 (openUPS HID 0.5) 固件 bug: 电池正常但误报 "No battery installed!"
+            filtered_alarm = self._filter_false_alarms(raw_alarm, vars_dict)
+
+            # 过滤状态标志中因误报产生的 ALARM 标志
+            filtered_status_flags = self._filter_alarm_status_flags(
+                status_flags, raw_alarm, filtered_alarm
+            )
+            filtered_status_str = " ".join(filtered_status_flags) if filtered_status_flags else status_str
+
             # 解析其他数据
             data = UpsData(
                 status=status,
-                status_raw=status_str,  # 保留原始状态字符串
-                status_flags=status_flags,  # 状态标志位列表
+                status_raw=filtered_status_str,  # 保留过滤后的状态字符串
+                status_flags=filtered_status_flags,  # 过滤后的状态标志位列表
                 battery_charge=self._parse_float(vars_dict.get("battery.charge")),
                 battery_runtime=self._parse_int(vars_dict.get("battery.runtime")),
                 input_voltage=self._parse_float(vars_dict.get("input.voltage")),
@@ -526,7 +539,7 @@ class UpsMonitor:
                 # Phase 3 扩展字段 - 自检和报警
                 ups_test_result=vars_dict.get("ups.test.result"),
                 ups_test_date=vars_dict.get("ups.test.date"),
-                ups_alarm=vars_dict.get("ups.alarm"),
+                ups_alarm=filtered_alarm,  # 使用过滤后的告警信息
                 ups_beeper_status=vars_dict.get("ups.beeper.status"),
                 # Phase 4 扩展字段 - 基于真实 UPS 测试
                 ups_realpower_nominal=self._parse_float(vars_dict.get("ups.realpower.nominal")),
@@ -558,6 +571,70 @@ class UpsMonitor:
             logger.error(f"Error reading UPS data: {e}")
             return None
     
+    # 已知的固件误报告警列表
+    # key: 告警文本（小写）, value: 验证函数名（返回 True 表示确认是误报）
+    KNOWN_FALSE_ALARMS = {
+        "no battery installed!": "_verify_battery_present",
+    }
+
+    def _filter_false_alarms(
+        self, raw_alarm: Optional[str], vars_dict: dict
+    ) -> Optional[str]:
+        """过滤已知的固件误报告警
+
+        某些 UPS 固件（如 W120 openUPS HID 0.5）会在电池正常时
+        误报告警信息。通过检查实际电池数据来判断是否为误报。
+        """
+        if not raw_alarm:
+            return None
+
+        alarm_lower = raw_alarm.strip().lower()
+        verify_method_name = self.KNOWN_FALSE_ALARMS.get(alarm_lower)
+
+        if verify_method_name:
+            verify_method = getattr(self, verify_method_name, None)
+            if verify_method and verify_method(vars_dict):
+                logger.info(
+                    f"Filtered false alarm: '{raw_alarm}' "
+                    f"(battery data confirms battery is present)"
+                )
+                return None
+
+        return raw_alarm
+
+    def _verify_battery_present(self, vars_dict: dict) -> bool:
+        """验证电池是否实际存在（用于过滤 'No battery installed!' 误报）
+
+        如果以下任一条件满足，认为电池存在，告警为误报:
+        - battery.charge 有有效值且 > 0
+        - battery.voltage 有有效值且 > 0
+        - battery.runtime 有有效值且 > 0
+        """
+        try:
+            charge = self._parse_float(vars_dict.get("battery.charge"))
+            voltage = self._parse_float(vars_dict.get("battery.voltage"))
+            runtime = self._parse_int(vars_dict.get("battery.runtime"))
+
+            battery_present = (
+                (charge is not None and charge > 0)
+                or (voltage is not None and voltage > 0)
+                or (runtime is not None and runtime > 0)
+            )
+            return battery_present
+        except Exception:
+            return False
+
+    def _filter_alarm_status_flags(
+        self,
+        status_flags: list,
+        raw_alarm: Optional[str],
+        filtered_alarm: Optional[str],
+    ) -> list:
+        """如果告警被过滤掉了，同时从状态标志中移除 ALARM 标志"""
+        if raw_alarm and not filtered_alarm and "ALARM" in status_flags:
+            return [f for f in status_flags if f != "ALARM"]
+        return status_flags
+
     def _parse_status(self, status_str: str) -> UpsStatus:
         """解析 UPS 状态字符串
         

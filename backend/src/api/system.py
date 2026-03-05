@@ -1060,6 +1060,9 @@ async def _collect_container_logs(
     """
     从多个候选容器名中获取日志并转换为 CST 时区
 
+    注意：直接使用 docker logs 命令，不经过 get_docker_logs()
+    以避免 Docker 环境检测导致获取不到真实容器日志
+
     Args:
         container_names: 容器名候选列表（按优先级尝试）
         tail: 获取最近多少行
@@ -1069,13 +1072,19 @@ async def _collect_container_logs(
     """
     for name in container_names:
         try:
-            lines = await get_docker_logs(name, tail=tail)
+            # 直接执行 docker logs，不经过 get_docker_logs 的 Docker 检测
+            result = await _exec_command(
+                ["docker", "logs", name, "--tail", str(tail), "--timestamps"],
+                timeout=15.0,
+            )
             # 排除错误提示信息
             if (
-                lines
-                and not lines[0].startswith("[获取")
-                and not lines[0].startswith("[Docker")
-                and not lines[0].startswith("[容器")
+                result
+                and not result.startswith("(命令不可用")
+                and not result.startswith("(执行失败")
+                and not result.startswith("(权限不足")
+                and not result.startswith("(系统错误")
+                and not result.startswith("(命令执行超时")
             ):
                 header = (
                     f"# Container: {name}\n"
@@ -1084,8 +1093,7 @@ async def _collect_container_logs(
                     f"# Tail: {tail} lines\n"
                     f"# Timezone: UTC+8 (CST)\n\n"
                 )
-                raw_text = '\n'.join(lines)
-                return header + _convert_logs_to_cst(raw_text)
+                return header + _convert_logs_to_cst(result)
         except Exception as e:
             logger.debug(f"Failed to get logs from container {name}: {e}")
             continue

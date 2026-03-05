@@ -369,7 +369,7 @@ POST /api/dev/mock/low-battery     # Simulate low battery
 ```bash
 # Backend
 cd backend
-uv pip install -r pyproject.toml
+uv sync
 uvicorn src.main:app --reload
 
 # Frontend

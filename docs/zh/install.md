@@ -10,7 +10,7 @@
 
 ### 方式一：Docker Compose 部署（推荐）
 
-适用于任意有 Docker 的设备。详细步骤请参考 [Docker 部署文档](./DOCKER_DEPLOYMENT.md)。
+适用于任意有 Docker 的设备。详细步骤请参考 [Docker 部署文档](./docker-deployment.md)。
 
 ### 方式二：懒猫微服部署
 

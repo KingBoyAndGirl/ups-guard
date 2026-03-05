@@ -862,8 +862,8 @@ docker-compose logs nut-server | Select-String "driver"
 
 ## 🔗 相关文档
 
-- [Docker 部署指南](docker-deployment.md)
-- [用户指南](user-guide.md)
-- [架构说明](architecture.md)
-- [常见问题](faq.md)
+- [Docker 部署指南](../docker-deployment.md)
+- [用户指南](../user-guide.md)
+- [架构说明](../architecture.md)
+- [常见问题](../faq.md)
 

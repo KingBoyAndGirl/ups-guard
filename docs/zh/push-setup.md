@@ -132,7 +132,7 @@ PushPlus 是另一个微信推送服务，功能更丰富。
 
 如果您需要集成其他推送服务（如 Telegram、钉钉、企业微信等），可以开发自定义插件。
 
-参见 [插件开发指南](./plugin-dev.md)。
+参见 [插件开发指南](./development/plugin-dev.md)。
 
 ## 常见问题
 

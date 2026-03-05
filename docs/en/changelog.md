@@ -56,10 +56,7 @@ This is the first official release of UPS Guard, marking the project's transitio
 - Fix CORS configuration allowing all origins security issue
 - Add API authentication to prevent unauthorized access
 - Use encrypted storage for sensitive configuration information
-- Update cryptography library to fix known vulnerabilities:
-  - CVE-2024-XXXX: Bleichenbacher timing oracle attack
-  - CVE-2024-YYYY: SSH certificates mishandling
-  - CVE-2024-ZZZZ: Subgroup attack on SECT curves
+- Update cryptography library to 46.0.5+ to fix known security vulnerabilities
 
 ---
 

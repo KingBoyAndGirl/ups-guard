@@ -29,7 +29,7 @@ deploy/
 ```bash
 # 使用 lzc-cli 打包
 cd deploy/lazycat
-./build.sh
+./deploy-to-lazycat.sh
 # 上传生成的 .lpk 文件到懒猫微服
 ```
 

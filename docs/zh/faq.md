@@ -754,9 +754,8 @@ docker exec -it ups-guard-backend printenv LOG_LEVEL
 
 ## 📚 相关文档
 
-- [测试验证指南](./testing-and-verification-guide.md) - 详细的测试步骤
 - [用户指南 - 监控模式](./user-guide.md#监控模式设置) - 配置说明
-- [实施总结](../IMPLEMENTATION_SUMMARY.md) - 技术细节
+- [架构文档](./architecture.md) - 技术架构和设计
 
 ---
 

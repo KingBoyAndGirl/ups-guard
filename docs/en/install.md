@@ -10,7 +10,7 @@
 
 ### Method 1: Docker Compose Deployment (Recommended)
 
-Suitable for any device with Docker. For detailed steps, see [Docker Deployment Documentation](./DOCKER_DEPLOYMENT.md).
+Suitable for any device with Docker. For detailed steps, see [Docker Deployment Documentation](./docker-deployment.md).
 
 ### Method 2: LazyCAT Deployment
 

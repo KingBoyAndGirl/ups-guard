@@ -87,10 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 修复 CORS 配置允许所有来源的安全隐患
 - 添加 API 认证，防止未授权访问
 - 使用加密存储敏感配置信息
-- 更新 cryptography 库修复已知漏洞：
-  - CVE-2024-XXXX: Bleichenbacher timing oracle attack
-  - CVE-2024-YYYY: SSH certificates mishandling
-  - CVE-2024-ZZZZ: Subgroup attack on SECT curves
+- 更新 cryptography 库至 46.0.5+ 修复已知安全漏洞
 
 ---
 

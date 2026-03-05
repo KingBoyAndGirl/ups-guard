@@ -132,7 +132,7 @@ All enabled channels will receive notifications simultaneously.
 
 If you need to integrate other push services (like Telegram, DingTalk, Enterprise WeChat, etc.), you can develop custom plugins.
 
-See [Plugin Development Guide](./plugin-dev.md).
+See [Plugin Development Guide](./development/plugin-dev.md).
 
 ## Common Issues
 

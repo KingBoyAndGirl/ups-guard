@@ -46,7 +46,7 @@ Welcome to UPS Guard documentation! This page provides navigation to both Chines
 
 ### Configuration & Development
 - [Push Notification Setup](en/push-setup.md) - Notification channel configuration
-- [Plugin Development Guide](en/plugin-dev.md) - Custom plugin development
+- [Plugin Development Guide](en/development/plugin-dev.md) - Custom plugin development
 - [Supported UPS Devices](en/supported-ups.md) - Compatible device list
 
 ### Technical Documentation

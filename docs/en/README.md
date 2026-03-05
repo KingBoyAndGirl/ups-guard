@@ -79,7 +79,7 @@ docker-compose up -d
 # Open http://localhost in browser
 ```
 
-For detailed Docker deployment guide, see [Docker Deployment Documentation](docs/DOCKER_DEPLOYMENT.md).
+For detailed Docker deployment guide, see [Docker Deployment Documentation](./docker-deployment.md).
 
 ### LazyCAT Deployment
 
@@ -122,7 +122,7 @@ For detailed Docker deployment guide, see [Docker Deployment Documentation](docs
    
    The frontend will automatically use the configured Token for authentication.
 
-For detailed installation guide, see [Installation Documentation](docs/install.md).
+For detailed installation guide, see [Installation Documentation](./install.md).
 
 ## ⚙️ Configuration
 
@@ -149,12 +149,12 @@ For detailed installation guide, see [Installation Documentation](docs/install.m
 
 ## 📚 Documentation
 
-- [Installation Guide](docs/install.md) - Complete installation and configuration steps
-- [Supported UPS Devices](docs/supported-ups.md) - Compatible device list
-- [Push Notification Setup](docs/push-setup.md) - ServerChan, PushPlus configuration tutorials
-- [Plugin Development Guide](docs/plugin-dev.md) - Custom notification plugin development
-- [Architecture Documentation](docs/architecture.md) - System architecture and technical details
-- [FAQ](docs/faq.md) - Frequently Asked Questions
+- [Installation Guide](./install.md) - Complete installation and configuration steps
+- [Supported UPS Devices](./supported-ups.md) - Compatible device list
+- [Push Notification Setup](./push-setup.md) - ServerChan, PushPlus configuration tutorials
+- [Plugin Development Guide](./development/plugin-dev.md) - Custom notification plugin development
+- [Architecture Documentation](./architecture.md) - System architecture and technical details
+- [FAQ](./faq.md) - Frequently Asked Questions
 
 ## 🛠️ Tech Stack
 
@@ -207,8 +207,13 @@ ups-guard/
 │   ├── Dockerfile
 │   └── entrypoint.sh
 ├── docs/                 # Documentation
-├── lzc-manifest.yml      # LazyCAT application manifest (LazyCAT specific)
-└── lzc-build.yml         # Build configuration (LazyCAT specific)
+├── deploy/               # Deployment configuration files
+│   ├── docker/           # Universal Docker deployment
+│   ├── lazycat/          # LazyCAT deployment
+│   │   ├── lzc-manifest.yml  # LazyCAT application manifest
+│   │   └── lzc-build.yml     # Build configuration
+│   ├── synology/         # Synology NAS deployment
+│   └── qnap/             # QNAP NAS deployment
 ```
 
 ## 🔧 Development
@@ -222,7 +227,7 @@ cd ups-guard
 
 # Start backend (Mock mode)
 cd backend
-uv pip install -r pyproject.toml
+uv sync
 MOCK_MODE=true uvicorn src.main:app --reload
 
 # Start frontend
@@ -236,10 +241,11 @@ Visit `http://localhost:5173` to view the frontend.
 ### Build Application
 
 ```bash
-# Build all containers
-./build.sh
+# Build Docker images (universal)
+docker-compose build
 
-# Or use lzc-cli (LazyCAT packaging, requires lzc-cli installation)
+# LazyCAT packaging (requires lzc-cli installation)
+cd deploy/lazycat
 lzc-cli package -m lzc-manifest.yml -o ups-guard.lpk
 ```
 

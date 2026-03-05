@@ -369,7 +369,7 @@ POST /api/dev/mock/low-battery     # 模拟低电量
 ```bash
 # 后端
 cd backend
-uv pip install -r pyproject.toml
+uv sync
 uvicorn src.main:app --reload
 
 # 前端

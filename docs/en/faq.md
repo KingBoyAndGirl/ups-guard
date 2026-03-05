@@ -294,7 +294,7 @@ docker logs ups-guard-backend | grep ERROR
 
 ### Q: How to develop custom notification plugin?
 
-A: See [Plugin Development Guide](./plugin-dev.md).
+A: See [Plugin Development Guide](./development/plugin-dev.md).
 
 Main steps:
 1. Inherit `NotifierPlugin` base class

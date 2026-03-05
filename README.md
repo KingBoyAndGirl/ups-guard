@@ -191,7 +191,7 @@ docker-compose up -d
 - [Docker 部署指南](docs/zh/docker-deployment.md) - Docker 环境部署
 - [支持的 UPS 设备](docs/zh/supported-ups.md) - 兼容设备列表
 - [推送通知配置](docs/zh/push-setup.md) - 通知渠道配置教程
-- [插件开发指南](docs/zh/plugin-dev.md) - 自定义通知插件开发
+- [插件开发指南](docs/zh/development/plugin-dev.md) - 自定义通知插件开发
 - [架构文档](docs/zh/architecture.md) - 系统架构和技术细节
 - [常见问题](docs/zh/faq.md) - FAQ
 - [更新日志](docs/zh/changelog.md) - 版本历史
@@ -204,7 +204,7 @@ docker-compose up -d
 - [Docker Deployment Guide](docs/en/docker-deployment.md) - Docker environment deployment
 - [Supported UPS Devices](docs/en/supported-ups.md) - Compatible device list
 - [Push Notification Setup](docs/en/push-setup.md) - Notification channel configuration
-- [Plugin Development Guide](docs/en/plugin-dev.md) - Custom plugin development
+- [Plugin Development Guide](docs/en/development/plugin-dev.md) - Custom plugin development
 - [Architecture](docs/en/architecture.md) - System architecture and technical details
 - [FAQ](docs/en/faq.md) - Frequently asked questions
 - [Changelog](docs/en/changelog.md) - Version history
@@ -278,7 +278,7 @@ cd ups-guard
 
 # 启动后端（Mock 模式）
 cd backend
-uv pip install -r pyproject.toml
+uv sync
 MOCK_MODE=true uvicorn src.main:app --reload
 
 # 启动前端
@@ -292,10 +292,11 @@ pnpm dev
 ### 构建应用
 
 ```bash
-# 构建所有容器
-./build.sh
+# 构建 Docker 镜像（通用）
+docker-compose build
 
-# 或使用 lzc-cli（懒猫微服打包，需安装 lzc-cli）
+# 懒猫微服打包（需安装 lzc-cli）
+cd deploy/lazycat
 lzc-cli package -m lzc-manifest.yml -o ups-guard.lpk
 ```
 

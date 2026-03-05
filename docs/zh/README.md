@@ -91,7 +91,7 @@ docker-compose up -d
 # 浏览器打开 http://localhost
 ```
 
-详细 Docker 部署指南请查看 [Docker 部署文档](docs/DOCKER_DEPLOYMENT.md)。
+详细 Docker 部署指南请查看 [Docker 部署文档](./docker-deployment.md)。
 
 ### 懒猫微服部署
 
@@ -134,7 +134,7 @@ docker-compose up -d
    
    前端访问时会自动使用配置的 Token 进行认证。
 
-详细安装指南请查看 [安装文档](docs/install.md)。
+详细安装指南请查看 [安装文档](./install.md)。
 
 ## ⚙️ 配置说明
 
@@ -161,12 +161,12 @@ docker-compose up -d
 
 ## 📚 文档
 
-- [安装指南](docs/install.md) - 完整的安装和配置步骤
-- [支持的 UPS 设备](docs/supported-ups.md) - 兼容设备列表
-- [推送通知配置](docs/push-setup.md) - Server酱、PushPlus 配置教程
-- [插件开发指南](docs/plugin-dev.md) - 自定义通知插件开发
-- [架构文档](docs/architecture.md) - 系统架构和技术细节
-- [常见问题](docs/faq.md) - FAQ
+- [安装指南](./install.md) - 完整的安装和配置步骤
+- [支持的 UPS 设备](./supported-ups.md) - 兼容设备列表
+- [推送通知配置](./push-setup.md) - Server酱、PushPlus 配置教程
+- [插件开发指南](./development/plugin-dev.md) - 自定义通知插件开发
+- [架构文档](./architecture.md) - 系统架构和技术细节
+- [常见问题](./faq.md) - FAQ
 
 ## 🛠️ 技术栈
 
@@ -219,8 +219,13 @@ ups-guard/
 │   ├── Dockerfile
 │   └── entrypoint.sh
 ├── docs/                 # 文档
-├── lzc-manifest.yml      # 懒猫应用清单（懒猫微服专用）
-└── lzc-build.yml         # 构建配置（懒猫微服专用）
+├── deploy/               # 部署配置文件
+│   ├── docker/           # 通用 Docker 部署
+│   ├── lazycat/          # 懒猫微服部署
+│   │   ├── lzc-manifest.yml  # 懒猫应用清单
+│   │   └── lzc-build.yml     # 构建配置
+│   ├── synology/         # 群晖 NAS 部署
+│   └── qnap/             # 威联通 NAS 部署
 ```
 
 ## 🔧 开发
@@ -234,7 +239,7 @@ cd ups-guard
 
 # 启动后端（Mock 模式）
 cd backend
-uv pip install -r pyproject.toml
+uv sync
 MOCK_MODE=true uvicorn src.main:app --reload
 
 # 启动前端
@@ -248,10 +253,11 @@ pnpm dev
 ### 构建应用
 
 ```bash
-# 构建所有容器
-./build.sh
+# 构建 Docker 镜像（通用）
+docker-compose build
 
-# 或使用 lzc-cli（懒猫微服打包，需安装 lzc-cli）
+# 懒猫微服打包（需安装 lzc-cli）
+cd deploy/lazycat
 lzc-cli package -m lzc-manifest.yml -o ups-guard.lpk
 ```
 
@@ -279,8 +285,8 @@ lzc-cli package -m lzc-manifest.yml -o ups-guard.lpk
 - **商业授权**: 闭源商业使用需获得商业授权
 
 详见：
-- [AGPL-3.0 协议](LICENSE)
-- [商业授权协议](COMMERCIAL_LICENSE.md)
+- [AGPL-3.0 协议](../../LICENSE)
+- [商业授权协议](../../COMMERCIAL_LICENSE.md)
 
 ## 🙏 致谢
 

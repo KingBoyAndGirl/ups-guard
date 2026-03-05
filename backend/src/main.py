@@ -3,6 +3,7 @@ import logging
 import asyncio
 import sys
 import os
+import time
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -45,10 +46,34 @@ import hooks.custom_script  # noqa: F401
 import hooks.agent_shutdown  # noqa: F401
 from hooks.registry import get_registry
 
-# 配置日志
+
+# ========== 日志时区配置（中国标准时间 UTC+8）==========
+class CSTFormatter(logging.Formatter):
+    """使用中国标准时间 (UTC+8) 的日志格式化器"""
+
+    def converter(self, timestamp):
+        """将时间戳转换为 CST 时间"""
+        return time.gmtime(timestamp + 8 * 3600)
+
+    def formatTime(self, record, datefmt=None):
+        """格式化时间，使用 CST"""
+        ct = self.converter(record.created)
+        if datefmt:
+            s = time.strftime(datefmt, ct)
+        else:
+            t = time.strftime('%Y-%m-%d %H:%M:%S', ct)
+            s = '%s,%03d' % (t, record.msecs)
+        return s
+
+
+# 配置日志（使用中国时间）
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(CSTFormatter(
+    fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+))
 logging.basicConfig(
     level=getattr(logging, settings.log_level),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    handlers=[_log_handler]
 )
 logger = logging.getLogger(__name__)
 

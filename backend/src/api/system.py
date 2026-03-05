@@ -1,6 +1,7 @@
 """系统信息 API"""
 import os
 import sys
+import re
 import json
 import platform
 import asyncio
@@ -992,7 +993,6 @@ def _generate_nut_parameters_report() -> str | None:
 
 
 # ========== 日志时间戳转换（UTC -> 中国时间 UTC+8）==========
-import re
 
 # 中国标准时间（UTC+8）
 _CST = timezone(timedelta(hours=8))
@@ -1122,6 +1122,7 @@ async def _collect_backend_logs(tail: int = 500) -> str:
 
     在 Docker 环境中，日志输出到 stdout，需要通过 docker logs 获取。
     尝试多个可能的容器名称。
+    日志中的 UTC 时间戳会自动转换为中国时间（UTC+8）。
     """
     # 可能的后端容器名称
     container_names = ["ups-guard-backend", "ups-guard", "backend"]
@@ -1129,7 +1130,8 @@ async def _collect_backend_logs(tail: int = 500) -> str:
     logs = await _collect_container_logs(container_names, tail=tail)
 
     if logs:
-        return logs
+        # 转换时间戳为中国时间
+        return _convert_logs_to_cst(logs)
 
     # 如果无法通过 docker logs 获取，返回提示信息
     return (
@@ -1146,6 +1148,7 @@ async def _collect_nut_container_logs(tail: int = 500) -> str:
     收集 NUT 容器日志
 
     包含 upsd、upsmon、驱动监控脚本等关键信息。
+    日志中的 UTC 时间戳会自动转换为中国时间（UTC+8）。
     """
     # 可能的 NUT 容器名称
     container_names = ["ups-guard-nut", "nut-server", "nut"]
@@ -1153,7 +1156,8 @@ async def _collect_nut_container_logs(tail: int = 500) -> str:
     logs = await _collect_container_logs(container_names, tail=tail)
 
     if logs:
-        return logs
+        # 转换时间戳为中国时间
+        return _convert_logs_to_cst(logs)
 
     # 如果在单容器环境（如懒猫），NUT 进程在同一容器内
     # 尝试读取 NUT 相关的日志文件
@@ -1179,7 +1183,8 @@ async def _collect_nut_container_logs(tail: int = 500) -> str:
                 logger.debug(f"Failed to read {path}: {e}")
 
     if collected_logs:
-        return "\n".join(collected_logs)
+        # 转换时间戳为中国时间
+        return _convert_logs_to_cst("\n".join(collected_logs))
 
     # 返回提示信息
     return (

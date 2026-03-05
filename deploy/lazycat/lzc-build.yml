@@ -38,3 +38,11 @@ devshell:
     # 安装后端依赖  
     if [ -d "backend" ]; then cd backend && pip install -e . && cd ..; fi
 
+# compose_override: Docker Compose 覆盖配置
+# usbhid-ups 驱动通过 libusb HID 接口访问 USB 设备，
+# 需要 privileged 权限（lzc-manifest.yml 不支持此字段）
+# 参考: https://developer.lazycat.cloud/advanced-compose-override.html
+compose_override:
+  services:
+    ups-guard:
+      privileged: true

@@ -71,10 +71,6 @@ UPSD_USER=${UPSD_USER:-admin}
 UPSD_PASSWORD=${UPSD_PASSWORD:-secret}
 UPSMON_USER=${UPSMON_USER:-monuser}
 UPSMON_PASSWORD=${UPSMON_PASSWORD:-secret}
-# 是否禁用自动关机（开发/测试环境设为 true）
-DISABLE_SHUTDOWN=${DISABLE_SHUTDOWN:-false}
-# 传统的关机命令（仅当 DISABLE_SHUTDOWN=false 时使用）
-SHUTDOWN_CMD=${SHUTDOWN_CMD:-"/sbin/shutdown -h +0"}
 # 低电量阈值覆盖（解决某些 UPS 报告异常阈值的问题，如 APC 的 95%）
 # 设置为合理值（如 20），UPS 电量低于此值才触发低电量警告
 BATTERY_CHARGE_LOW=${BATTERY_CHARGE_LOW:-20}
@@ -331,13 +327,9 @@ cat > /etc/nut/upsd.users << EOF
 EOF
 
 # 生成 upsmon.conf
-# 根据 DISABLE_SHUTDOWN 环境变量决定关机行为
-if [ "$DISABLE_SHUTDOWN" = "true" ]; then
-    ACTUAL_SHUTDOWN_CMD="/bin/echo 'UPS Guard: Shutdown signal received (handled by backend)'"
-    echo "注意：自动关机已禁用（DISABLE_SHUTDOWN=true）"
-else
-    ACTUAL_SHUTDOWN_CMD="$SHUTDOWN_CMD"
-fi
+# NUT upsmon 不负责关机，关机由 UPS Guard 后端的 ShutdownManager 控制
+# 这里的 SHUTDOWNCMD 仅用于满足 upsmon 配置要求，实际不会执行系统关机
+ACTUAL_SHUTDOWN_CMD="/bin/echo 'UPS Guard: upsmon FSD triggered (shutdown handled by backend)'"
 
 cat > /etc/nut/upsmon.conf << EOF
 # 由 entrypoint.sh 自动生成
@@ -484,6 +476,11 @@ monitor_ups_driver() {
     local usb_device_missing=false  # 标记 USB 设备是否丢失
     local usb_missing_retry_count=0  # USB 设备丢失后的重试计数
 
+    # 驱动回退机制变量
+    local driver_fail_count=0           # 当前驱动连续失败计数
+    local max_driver_failures=3         # 触发驱动回退的失败次数阈值
+    local driver_fallback_attempted=false  # 是否已尝试过回退
+
     echo "═══════════════════════════════════════"
     echo "  UPS 驱动自动监控已启动 (v2)"
     echo "═══════════════════════════════════════"
@@ -621,6 +618,8 @@ SWITCH_EOF
                         # 确保所有 upsmon 进程都被杀死（防止残留）
                         killall -9 upsmon 2>/dev/null || true
                         killall -9 upsd 2>/dev/null || true
+                        # 清理 FSD 状态文件（防止 upsmon 重启后仍处于 FSD 状态）
+                        rm -f /etc/killpower 2>/dev/null || true
                         # 删除 PID 文件
                         rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2>/dev/null || true
                         sleep 2
@@ -743,6 +742,8 @@ SWITCH_EOF
                     kill $UPSD_PID 2>/dev/null || true
                     kill $UPSMON_PID 2>/dev/null || true
                     killall -9 upsd upsmon 2>/dev/null || true
+                    # 清理 FSD 状态文件（防止 upsmon 重启后仍处于 FSD 状态）
+                    rm -f /etc/killpower 2>/dev/null || true
                     rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2>/dev/null || true
                     sleep 2
 
@@ -1065,12 +1066,16 @@ MONITOR_EOF
                 # 重启驱动（使用 timeout 防止卡死）
                 if timeout 45 upsdrvctl start 2>&1; then
                     echo "$(date): ✅ UPS 驱动重启成功"
+                    driver_fail_count=0  # 重置失败计数
+                    driver_fallback_attempted=false  # 重置回退标记
 
                     # 强制杀死旧的 upsd/upsmon 进程
                     kill $UPSD_PID 2>/dev/null || true
                     kill $UPSMON_PID 2>/dev/null || true
                     killall -9 upsd 2>/dev/null || true
                     killall -9 upsmon 2>/dev/null || true
+                    # 清理 FSD 状态文件（防止 upsmon 重启后仍处于 FSD 状态）
+                    rm -f /etc/killpower 2>/dev/null || true
                     rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2>/dev/null || true
                     sleep 2
 
@@ -1085,7 +1090,59 @@ MONITOR_EOF
 
                     echo "$(date): ✅ upsd/upsmon 已重新加载配置 (upsd PID: $UPSD_PID, upsmon PID: $UPSMON_PID)"
                 else
-                    echo "$(date): ❌ UPS 驱动重启失败，将继续重试..."
+                    driver_fail_count=$((driver_fail_count + 1))
+                    echo "$(date): ❌ UPS 驱动重启失败 (连续第 ${driver_fail_count} 次)，将继续重试..."
+
+                    # ===== 驱动回退逻辑 =====
+                    if [ $driver_fail_count -ge $max_driver_failures ] && [ "$driver_fallback_attempted" = false ]; then
+                        # 根据 VID 确定推荐驱动
+                        local fallback_driver=""
+                        case "$found_vendor" in
+                            "0665") fallback_driver="usbhid-ups" ;;   # CyberPower
+                            "051d") fallback_driver="usbhid-ups" ;;   # APC
+                            "06da") fallback_driver="usbhid-ups" ;;   # Eaton/Phoenixtec
+                            *)      fallback_driver="usbhid-ups" ;;   # 默认回退
+                        esac
+
+                        if [ "$found_driver" != "$fallback_driver" ]; then
+                            echo "$(date): 🔄 驱动 '${found_driver}' 连续失败 ${driver_fail_count} 次，回退到推荐驱动 '${fallback_driver}'"
+                            local original_driver="$found_driver"
+                            found_driver="$fallback_driver"
+                            driver_fallback_attempted=true
+                            driver_fail_count=0
+
+                            # 重新生成 ups.conf（使用回退驱动）
+                            local runtimecal_opts_fallback
+                            runtimecal_opts_fallback=$(generate_runtimecal_opts "${fallback_driver}")
+
+                            cat > /etc/nut/ups.conf << FALLBACK_EOF
+# 由 monitor_ups_driver 自动回退驱动
+# 回退时间: $(date)
+# 原驱动: ${original_driver} -> 回退驱动: ${fallback_driver}
+maxretry = 5
+retrydelay = 3
+user = root
+
+[${new_ups_name}]
+    driver = ${fallback_driver}
+    port = ${found_port}
+    desc = "${found_model}"
+    vendorid = "${found_vendor}"
+    productid = "${found_product}"
+${subdriver_opt_mon}
+    override.battery.charge.low = $BATTERY_CHARGE_LOW
+    override.battery.runtime.low = $BATTERY_RUNTIME_LOW
+    ignorelb
+    pollinterval = 5
+${runtimecal_opts_fallback}
+FALLBACK_EOF
+                            echo "$(date): 📝 已更新 ups.conf，驱动切换为 ${fallback_driver}"
+                        else
+                            echo "$(date): ⚠️  当前已是推荐驱动 '${fallback_driver}'，无法回退"
+                            driver_fallback_attempted=true
+                        fi
+                    fi
+                    # ===== 回退逻辑结束 =====
                 fi
             else
                 # 没有 nut-scanner，直接尝试重启驱动

@@ -192,11 +192,13 @@ class RealNutClient:
             else:
                 logger.warning(f"Failed to auto-discover UPS: {e}, keeping previous name '{self.ups_name}'")
 
-    async def _send_raw_command(self, command: str) -> str:
-        """发送原始命令（不检查连接状态，用于初始化）"""
+    async def _send_raw_command(self, command: str, timeout: float = 10.0) -> str:
+        """发送原始命令（不检查连接状态，用于初始化和探测）"""
+        if not self.writer or not self.reader:
+            raise RuntimeError("No active connection")
         self.writer.write(f"{command}\n".encode())
         await self.writer.drain()
-        response = await self.reader.readline()
+        response = await asyncio.wait_for(self.reader.readline(), timeout=timeout)
         return response.decode().strip()
 
     async def _reconnect(self):
@@ -229,6 +231,36 @@ class RealNutClient:
             # 如果 UPS 名称改变了，记录日志
             if old_ups_name and old_ups_name != self.ups_name:
                 logger.info(f"UPS name changed from '{old_ups_name}' to '{self.ups_name}'")
+
+            # ===== 连接后探测验证 =====
+            # TCP 连接成功不代表 upsd 后端的驱动已就绪
+            # 尝试读取一个简单变量来验证数据通道是否可用
+            try:
+                probe_response = await self._send_raw_command(
+                    f"GET VAR {self.ups_name} ups.status", timeout=5.0
+                )
+                if not probe_response or not probe_response.startswith("VAR"):
+                    logger.warning(
+                        f"Reconnection probe: unexpected response '{probe_response}', "
+                        "UPS driver may not be ready"
+                    )
+                    self._connected = False
+                    return False
+                logger.info(f"Reconnection probe successful: {probe_response}")
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Reconnection: TCP connected but probe timed out, "
+                    "UPS driver not ready"
+                )
+                self._connected = False
+                return False
+            except Exception as probe_err:
+                logger.warning(
+                    f"Reconnection: TCP connected but probe failed: {probe_err}"
+                )
+                self._connected = False
+                return False
+            # ===== 探测验证结束 =====
 
             logger.info("Reconnection successful")
             # 注意：不在这里触发重连回调，由 monitor 统一管理

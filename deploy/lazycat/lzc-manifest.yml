@@ -65,6 +65,5 @@ services:
       - NUT_PASSWORD=secret
       - UPS_DRIVER=usbhid-ups
       - UPS_PORT=auto
-      - DISABLE_SHUTDOWN=false
       - LZC_API_GATEWAY_ADDRESS=app.cloud.lazycat.app.ups-guard.lzcapp:81
       # API_TOKEN 不再硬编码，首次启动自动生成并持久化到 /data/.api_token

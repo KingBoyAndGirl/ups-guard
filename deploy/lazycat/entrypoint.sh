@@ -29,7 +29,6 @@ export UPSD_USER="${UPSD_USER:-admin}"
 export UPSD_PASSWORD="${UPSD_PASSWORD:-secret}"
 export UPSMON_USER="${UPSMON_USER:-monuser}"
 export UPSMON_PASSWORD="${UPSMON_PASSWORD:-secret}"
-export DISABLE_SHUTDOWN="${DISABLE_SHUTDOWN:-true}"
 
 echo "Configuration:"
 echo "  DATA_DIR: ${DATA_DIR}"
@@ -37,7 +36,6 @@ echo "  DATABASE_PATH: ${DATABASE_PATH}"
 echo "  LOG_LEVEL: ${LOG_LEVEL}"
 echo "  MOCK_MODE: ${MOCK_MODE}"
 echo "  UPS_DRIVER: ${UPS_DRIVER}"
-echo "  DISABLE_SHUTDOWN: ${DISABLE_SHUTDOWN}"
 
 # 确保数据目录存在
 mkdir -p "${DATA_DIR}"

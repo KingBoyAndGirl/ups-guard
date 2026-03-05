@@ -35,9 +35,6 @@ services:
       - UPS_USB_SCAN_INTERVAL=${UPS_USB_SCAN_INTERVAL:-10}    # USB 扫描间隔（秒，影响热插拔响应速度）
       # 日志级别: debug, info, warn, error
       - LOG_LEVEL=${NUT_LOG_LEVEL:-info}
-      # 禁用自动关机（开发/测试环境设为 true，生产环境设为 false）
-      # 当设为 true 时，NUT 容器不会执行关机，关机逻辑由后端控制
-      - DISABLE_SHUTDOWN=${DISABLE_SHUTDOWN:-true}
     volumes:
       - /dev/bus/usb:/dev/bus/usb
     # USB 设备热插拔支持

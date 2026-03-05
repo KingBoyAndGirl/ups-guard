@@ -991,6 +991,206 @@ def _generate_nut_parameters_report() -> str | None:
         return None
 
 
+# ========== 日志时间戳转换（UTC -> 中国时间 UTC+8）==========
+import re
+
+# 中国标准时间（UTC+8）
+_CST = timezone(timedelta(hours=8))
+
+# 匹配常见的 UTC 时间戳格式
+_TIMESTAMP_PATTERNS = [
+    # Docker 时间戳: 2026-03-05T03:08:16.556240350Z
+    (re.compile(r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z'), '%Y-%m-%dT%H:%M:%S'),
+    # Docker 时间戳（无纳秒）: 2026-03-05T03:08:16Z
+    (re.compile(r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z'), '%Y-%m-%dT%H:%M:%S'),
+    # Python 日志: 2026-03-05 03:08:16,556
+    (re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+'), '%Y-%m-%d %H:%M:%S'),
+    # ISO 格式: 2026-03-05T03:08:16
+    (re.compile(r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?![.\dZ])'), '%Y-%m-%dT%H:%M:%S'),
+]
+
+
+def _convert_line_to_cst(line: str) -> str:
+    """
+    将日志行中的 UTC 时间戳转换为中国时间（UTC+8）
+
+    支持的格式：
+    - Docker 时间戳: 2026-03-05T03:08:16.556240350Z
+    - Python 日志: 2026-03-05 03:08:16,556
+    - ISO 格式: 2026-03-05T03:08:16
+    """
+    for pattern, fmt in _TIMESTAMP_PATTERNS:
+        match = pattern.search(line)
+        if match:
+            try:
+                utc_str = match.group(1)
+                utc_dt = datetime.strptime(utc_str, fmt).replace(tzinfo=timezone.utc)
+                cst_dt = utc_dt.astimezone(_CST)
+                cst_str = cst_dt.strftime('%Y-%m-%d %H:%M:%S')
+                # 替换原时间戳（包括可能的毫秒/纳秒部分和Z后缀）
+                line = line[:match.start()] + cst_str + line[match.end():]
+            except ValueError:
+                pass  # 解析失败则保留原样
+    return line
+
+
+def _convert_logs_to_cst(logs: str) -> str:
+    """
+    将日志内容中的所有 UTC 时间戳转换为中国时间（UTC+8）
+
+    Args:
+        logs: 原始日志文本
+
+    Returns:
+        转换后的日志文本，时间戳已转为 CST
+    """
+    if not logs:
+        return logs
+
+    lines = logs.split('\n')
+    converted_lines = [_convert_line_to_cst(line) for line in lines]
+    return '\n'.join(converted_lines)
+
+
+async def _collect_container_logs(container_names: list[str], tail: int = 500, timestamps: bool = True) -> str:
+    """
+    收集容器日志（通用方法）
+
+    Args:
+        container_names: 要尝试的容器名称列表
+        tail: 获取的日志行数
+        timestamps: 是否包含时间戳
+
+    Returns:
+        日志内容字符串
+    """
+    for name in container_names:
+        try:
+            # 构建命令
+            cmd = ['docker', 'logs', name, '--tail', str(tail)]
+            if timestamps:
+                cmd.append('--timestamps')
+
+            # 使用异步或同步方式执行
+            if sys.platform == 'win32':
+                result = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: subprocess.run(cmd, capture_output=True, timeout=10)
+                )
+            else:
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+
+                # 创建一个模拟的 result 对象
+                class Result:
+                    pass
+                result = Result()
+                result.returncode = process.returncode
+                result.stdout = stdout
+                result.stderr = stderr
+
+            if result.returncode == 0:
+                # docker logs 输出可能在 stdout 或 stderr
+                output = b''
+                if result.stdout:
+                    output = result.stdout
+                elif result.stderr:
+                    # 检查是否是真正的错误还是日志输出
+                    stderr_text = result.stderr.decode('utf-8', errors='ignore')
+                    if not stderr_text.startswith('Error'):
+                        output = result.stderr
+
+                if output:
+                    return output.decode('utf-8', errors='ignore').strip()
+        except asyncio.TimeoutError:
+            logger.debug(f"Timeout getting logs from container {name}")
+            continue
+        except Exception as e:
+            logger.debug(f"Failed to get logs from container {name}: {e}")
+            continue
+
+    return ""
+
+
+async def _collect_backend_logs(tail: int = 500) -> str:
+    """
+    收集后端服务日志
+
+    在 Docker 环境中，日志输出到 stdout，需要通过 docker logs 获取。
+    尝试多个可能的容器名称。
+    """
+    # 可能的后端容器名称
+    container_names = ["ups-guard-backend", "ups-guard", "backend"]
+
+    logs = await _collect_container_logs(container_names, tail=tail)
+
+    if logs:
+        return logs
+
+    # 如果无法通过 docker logs 获取，返回提示信息
+    return (
+        f"[{datetime.now().isoformat()}] 后端日志收集说明\n"
+        "=====================================\n"
+        "后端日志输出到 stdout/stderr，请通过以下方式查看：\n"
+        "  - Docker: docker logs ups-guard-backend\n"
+        "  - 懒猫: 在应用日志中查看\n"
+    )
+
+
+async def _collect_nut_container_logs(tail: int = 500) -> str:
+    """
+    收集 NUT 容器日志
+
+    包含 upsd、upsmon、驱动监控脚本等关键信息。
+    """
+    # 可能的 NUT 容器名称
+    container_names = ["ups-guard-nut", "nut-server", "nut"]
+
+    logs = await _collect_container_logs(container_names, tail=tail)
+
+    if logs:
+        return logs
+
+    # 如果在单容器环境（如懒猫），NUT 进程在同一容器内
+    # 尝试读取 NUT 相关的日志文件
+    nut_log_paths = [
+        "/var/log/nut/upsd.log",
+        "/var/log/nut/upsmon.log",
+        "/var/log/messages",
+    ]
+
+    collected_logs = []
+    for path in nut_log_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
+                    # 取最后 tail 行
+                    tail_lines = lines[-tail:] if len(lines) > tail else lines
+                    if tail_lines:
+                        collected_logs.append(f"=== {path} ===")
+                        collected_logs.extend(line.rstrip() for line in tail_lines)
+                        collected_logs.append("")
+            except Exception as e:
+                logger.debug(f"Failed to read {path}: {e}")
+
+    if collected_logs:
+        return "\n".join(collected_logs)
+
+    # 返回提示信息
+    return (
+        f"[{datetime.now().isoformat()}] NUT 容器日志收集说明\n"
+        "=====================================\n"
+        "NUT 日志输出到 stdout/stderr，请通过以下方式查看：\n"
+        "  - Docker: docker logs ups-guard-nut\n"
+        "  - 懒猫: 在应用日志中查看\n"
+    )
+
+
 @router.get("/system/diagnostics/download")
 async def download_diagnostics():
     """
@@ -999,6 +1199,8 @@ async def download_diagnostics():
     包含：
     - diagnostics.json: 系统诊断报告
     - nut-parameters-report.md: NUT 参数测试报告（如果 NUT 服务可用）
+    - logs/backend.log: 后端服务最近日志
+    - logs/nut-container.log: NUT 容器最近日志
     """
     try:
         # 1. 获取诊断报告 JSON
@@ -1013,7 +1215,14 @@ async def download_diagnostics():
         # 2. 生成 NUT 参数测试报告（在线程池中执行，避免阻塞事件循环）
         nut_report_content = await asyncio.to_thread(_generate_nut_parameters_report)
 
-        # 3. 打包为 ZIP
+        # 3. 收集容器日志（并行执行以提高效率）
+        backend_logs_task = asyncio.create_task(_collect_backend_logs(tail=500))
+        nut_logs_task = asyncio.create_task(_collect_nut_container_logs(tail=500))
+
+        backend_logs = await backend_logs_task
+        nut_logs = await nut_logs_task
+
+        # 4. 打包为 ZIP
         zip_buffer = BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
             # 写入诊断报告 JSON
@@ -1023,9 +1232,15 @@ async def download_diagnostics():
             if nut_report_content:
                 zf.writestr("nut-parameters-report.md", nut_report_content)
 
+            # 写入日志文件
+            if backend_logs:
+                zf.writestr("logs/backend.log", backend_logs)
+            if nut_logs:
+                zf.writestr("logs/nut-container.log", nut_logs)
+
         zip_buffer.seek(0)
 
-        # 4. 返回 ZIP 文件
+        # 5. 返回 ZIP 文件
         timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
         filename = f"ups-guard-diagnostics-{timestamp}.zip"
 

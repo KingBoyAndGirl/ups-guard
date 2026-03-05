@@ -48,32 +48,22 @@ from hooks.registry import get_registry
 
 
 # ========== 日志时区配置（中国标准时间 UTC+8）==========
-class CSTFormatter(logging.Formatter):
+class _CSTFormatter(logging.Formatter):
     """使用中国标准时间 (UTC+8) 的日志格式化器"""
 
-    def converter(self, timestamp):
-        """将时间戳转换为 CST 时间"""
+    @staticmethod
+    def converter(timestamp: float) -> time.struct_time:
         return time.gmtime(timestamp + 8 * 3600)
 
-    def formatTime(self, record, datefmt=None):
-        """格式化时间，使用 CST"""
-        ct = self.converter(record.created)
-        if datefmt:
-            s = time.strftime(datefmt, ct)
-        else:
-            t = time.strftime('%Y-%m-%d %H:%M:%S', ct)
-            s = '%s,%03d' % (t, record.msecs)
-        return s
 
-
-# 配置日志（使用中国时间）
-_log_handler = logging.StreamHandler()
-_log_handler.setFormatter(CSTFormatter(
-    fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-))
+# 配置日志（使用 CST 时区）
+_cst_handler = logging.StreamHandler()
+_cst_handler.setFormatter(
+    _CSTFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+)
 logging.basicConfig(
     level=getattr(logging, settings.log_level),
-    handlers=[_log_handler]
+    handlers=[_cst_handler],
 )
 logger = logging.getLogger(__name__)
 

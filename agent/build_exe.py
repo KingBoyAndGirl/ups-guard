@@ -63,6 +63,12 @@ def run_pyinstaller(icon_path) -> None:
         "--hidden-import=ups_guard_agent.client",
         "--hidden-import=ups_guard_agent.commands",
         "--hidden-import=ups_guard_agent.system_info",
+        "--hidden-import=ups_guard_agent.win_service",
+        "--hidden-import=win32serviceutil",
+        "--hidden-import=win32service",
+        "--hidden-import=win32event",
+        "--hidden-import=servicemanager",
+        "--hidden-import=win32api",
         str(ENTRY),
     ]
     if icon_path is not None:

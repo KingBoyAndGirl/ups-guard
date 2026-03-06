@@ -141,7 +141,7 @@ class AgentConnectionManager:
         如果 Agent 刚连接，可能需要短暂等待才能响应，因此会进行最多 2 次重试。
         """
         if agent_id not in self._agents:
-            logger.debug(f"Agent {agent_id} not in agents dict, offline")
+            logger.info(f"Agent {agent_id} not in agents dict (online agents: {list(self._agents.keys())})")
             return False
 
         # 最多重试 2 次（首次失败可能是 Agent 刚连接，消息循环还未就绪）
@@ -155,24 +155,25 @@ class AgentConnectionManager:
 
             try:
                 ws = self._agents[agent_id].websocket
+                logger.debug(f"Agent {agent_id} online check: sending ping (id={ping_id[:12]}...)")
                 await ws.send_json({
                     "type": "ping",
                     "data": {"request_id": ping_id},
                 })
                 # 等待 pong 回复，最多 3 秒
                 await asyncio.wait_for(future, timeout=3.0)
-                logger.debug(f"Agent {agent_id} online check: OK")
+                logger.info(f"Agent {agent_id} online check: OK (pong received)")
                 return True
             except asyncio.TimeoutError:
                 if attempt < max_retries - 1:
                     logger.debug(f"Agent {agent_id} online check: pong timeout, retrying ({attempt + 1}/{max_retries})...")
                     await asyncio.sleep(0.5)  # 短暂等待后重试
                     continue
-                logger.info(f"Agent {agent_id} online check: pong timeout after {max_retries} attempts, cleaning up stale connection")
+                logger.warning(f"Agent {agent_id} online check: pong timeout after {max_retries} attempts, cleaning up stale connection")
                 self.unregister(agent_id)
                 return False
             except Exception as e:
-                logger.info(f"Agent {agent_id} online check failed: {e}, cleaning up")
+                logger.warning(f"Agent {agent_id} online check failed: {e}, cleaning up")
                 self.unregister(agent_id)
                 return False
             finally:

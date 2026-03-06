@@ -25,9 +25,11 @@ class ConfigWindow:
         self,
         on_save: Optional[Callable] = None,
         on_close: Optional[Callable] = None,
+        on_autostart_changed: Optional[Callable] = None,
     ):
         self._on_save = on_save
         self._on_close = on_close
+        self._on_autostart_changed = on_autostart_changed
         self._root: Optional[tk.Tk] = None
         self._hidden_root: Optional[tk.Tk] = None
         self._entries: dict = {}
@@ -309,6 +311,8 @@ class ConfigWindow:
                         def _on_success(m=msg):
                             self._status_label.config(text=m, foreground="green")
                             self._autostart_var.set(expected)
+                            if self._on_autostart_changed:
+                                self._on_autostart_changed(expected)
 
                         root.after(0, _on_success)
                         return
@@ -334,6 +338,8 @@ class ConfigWindow:
                         if is_autostart_enabled():
                             # 已提权：服务已同步安装完成
                             self._status_label.config(text="✅ 开机自启已成功安装", foreground="green")
+                            if self._on_autostart_changed:
+                                self._on_autostart_changed(True)
                         else:
                             # 未提权：UAC 弹窗待确认，轮询结果
                             self._status_label.config(
@@ -355,6 +361,8 @@ class ConfigWindow:
                         if not is_autostart_enabled():
                             # 已提权：服务已同步卸载完成
                             self._status_label.config(text="✅ 开机自启已成功卸载", foreground="green")
+                            if self._on_autostart_changed:
+                                self._on_autostart_changed(False)
                         else:
                             # 未提权：UAC 弹窗待确认，轮询结果
                             self._status_label.config(

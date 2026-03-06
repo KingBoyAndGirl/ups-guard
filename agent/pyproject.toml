@@ -9,6 +9,7 @@ dependencies = [
     "pystray>=0.19",
     "Pillow>=10.0",
     "psutil>=5.9",
+    "pywin32>=306; sys_platform == 'win32'",
 ]
 
 [project.scripts]

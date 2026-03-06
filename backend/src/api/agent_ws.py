@@ -11,6 +11,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/agents")
+async def list_online_agents():
+    """列出当前在线的 Agent"""
+    manager = get_agent_manager()
+    agents = manager.list_agents()
+    return {"agents": agents, "count": len(agents)}
+
+
 @router.websocket("/ws/agent")
 async def agent_websocket(
     websocket: WebSocket,
@@ -19,13 +27,19 @@ async def agent_websocket(
     agent_name: str = Query(...),
 ):
     """Agent WebSocket 端点"""
+    client_host = websocket.client.host if websocket.client else "unknown"
+    logger.info(f"Agent WebSocket connection attempt: id={agent_id} name={agent_name} from={client_host}")
+
     # 认证
     expected_token = settings.get_or_generate_api_token()
     if token != expected_token:
+        logger.warning(f"Agent {agent_id} authentication failed: invalid token from {client_host}")
         await websocket.close(code=4001, reason="Unauthorized")
         return
 
     await websocket.accept()
+    logger.info(f"✅ Agent connected: id={agent_id} name={agent_name} from={client_host}")
+
     manager = get_agent_manager()
     await manager.register(agent_id, agent_name, websocket)
 

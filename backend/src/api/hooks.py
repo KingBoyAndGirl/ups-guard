@@ -54,6 +54,9 @@ async def test_hook(request: HookTestRequest):
 
     except asyncio.TimeoutError:
         return {"success": False, "message": f"Hook 测试超时（{DEVICE_CONNECTION_TIMEOUT}秒无响应）"}
+    except ConnectionError as e:
+        # Agent 等插件抛出的带有详细诊断信息的连接错误
+        return {"success": False, "message": str(e)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

@@ -105,12 +105,28 @@ def _open_settings(client=None):
     from ups_guard_agent.gui import ConfigWindow
 
     save_callback = None
+    autostart_callback = None
+
     if client is not None:
         def save_callback(cfg):
             client.update_config(cfg.server_url, cfg.token, cfg.agent_id, cfg.agent_name)
             client.reconnect()
 
-    win = ConfigWindow(on_save=save_callback)
+        def autostart_callback(enabled: bool):
+            """服务安装/卸载后处理 WebSocket 冲突。
+
+            安装服务后：服务进程会启动自己的 WebSocket 客户端，
+            当前进程必须停止自己的客户端，避免两个连接竞争同一个 agent_id。
+            卸载服务后：当前进程需要重新连接。
+            """
+            if enabled:
+                logger.info("Service installed — stopping current WebSocket client to avoid conflict")
+                client.stop()
+            else:
+                logger.info("Service removed — reconnecting WebSocket client")
+                client.reconnect()
+
+    win = ConfigWindow(on_save=save_callback, on_autostart_changed=autostart_callback)
     win.show(wait=False)
 
 
@@ -152,7 +168,19 @@ def _run_service_mode(args) -> None:
     """Windows 服务模式：纯后台运行，无 GUI / 无托盘，负责 WebSocket 连接。
 
     状态通过共享 JSON 文件暴露给托盘伴侣进程。
+
+    在 Windows 上使用 pywin32 ServiceFramework 与 SCM 正确通信。
+    在非 Windows 平台上直接运行 asyncio 事件循环（兼容 Linux/macOS）。
     """
+    if sys.platform == "win32":
+        try:
+            from ups_guard_agent.win_service import run_service_dispatch
+            run_service_dispatch()
+            return
+        except ImportError:
+            logger.warning("pywin32 not available, falling back to direct mode")
+
+    # 非 Windows 或 pywin32 不可用时的降级方案
     from ups_guard_agent.config import AgentConfig, CONFIG_FILE
     from ups_guard_agent.commands import handle_command
     from ups_guard_agent.client import AgentClient

@@ -162,12 +162,52 @@ class AgentShutdownHook(PreShutdownHook):
         return success
 
     async def test_connection(self) -> bool:
-        """检测 Agent 是否在线"""
+        """检测 Agent 是否在线，失败时抛出包含诊断信息的异常"""
         from services.agent_manager import get_agent_manager
 
         agent_id = self.config.get("agent_id", "").strip()
+        if not agent_id:
+            raise ValueError("Agent ID 未配置")
+
         manager = get_agent_manager()
-        return await manager.check_agent_online(agent_id)
+
+        # 获取当前在线 Agent 列表用于诊断
+        online_agents = manager.list_agents()
+        online_agent_ids = [a["agent_id"] for a in online_agents]
+
+        # 检查 Agent 是否在线
+        is_online = await manager.check_agent_online(agent_id)
+
+        if is_online:
+            return True
+
+        # 构建详细的错误诊断信息
+        if not online_agents:
+            error_msg = (
+                f"Agent '{agent_id}' 未连接到服务端。\n"
+                f"当前没有任何 Agent 在线。\n\n"
+                f"排查步骤：\n"
+                f"1. 确认 Agent 程序正在运行\n"
+                f"2. 检查 Agent 配置中的 server_url 是否指向本服务地址\n"
+                f"3. 检查网络连通性和防火墙设置"
+            )
+        elif agent_id in online_agent_ids:
+            error_msg = (
+                f"Agent '{agent_id}' 已连接但无响应（可能刚重启或网络不稳定）。\n"
+                f"请稍后重试，或检查 Agent 程序状态。"
+            )
+        else:
+            # 在线但 ID 不匹配
+            online_list = "\n".join([f"  - {a['agent_id']} ({a.get('agent_name', '未命名')})" for a in online_agents])
+            error_msg = (
+                f"Agent '{agent_id}' 未找到。\n\n"
+                f"当前在线的 Agent ({len(online_agents)} 个)：\n{online_list}\n\n"
+                f"可能原因：\n"
+                f"1. Agent ID 配置不匹配（请核对 Agent 客户端中配置的 ID）\n"
+                f"2. Agent 尚未连接到服务端"
+            )
+
+        raise ConnectionError(error_msg)
 
     async def reboot(self) -> bool:
         """重启设备"""

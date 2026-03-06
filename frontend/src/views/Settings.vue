@@ -3581,6 +3581,7 @@ watch(
   margin-bottom: var(--spacing-sm);
   border: 1px solid transparent;
   transition: all 0.2s;
+  overflow: hidden;
 }
 
 .hook-item.hook-disabled {
@@ -3592,15 +3593,20 @@ watch(
   align-items: center;
   gap: var(--spacing-md);
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .hook-info {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .hook-name-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.25rem;
 }
@@ -3608,6 +3614,10 @@ watch(
 .hook-name {
   font-weight: 500;
   color: var(--text-primary);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hook-type-badge {
@@ -3670,6 +3680,8 @@ watch(
 .hook-actions {
   display: flex;
   gap: 0.25rem;
+  flex-shrink: 0;
+  margin-left: var(--spacing-sm);
 }
 
 .add-hook {

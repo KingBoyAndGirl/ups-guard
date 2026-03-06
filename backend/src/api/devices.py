@@ -337,6 +337,8 @@ async def get_devices_status():
         
         except asyncio.TimeoutError:
             device_status["error"] = "连接超时"
+        except ConnectionError as e:
+            device_status["error"] = str(e)
         except ValueError as e:
             device_status["error"] = f"配置错误: {str(e)}"
         except Exception as e:

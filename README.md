@@ -357,6 +357,17 @@ This project uses a **dual-licensing model: AGPL-3.0 + Commercial License**.
 - [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架 / Progressive JavaScript framework
 - [ECharts](https://echarts.apache.org/) - 数据可视化图表库 / Data visualization chart library
 
+## ☕ 赞助支持 / Sponsor & Support
+
+如果这个项目对您有帮助，欢迎请作者喝杯咖啡 ☕
+
+If this project is helpful to you, feel free to buy the author a coffee ☕
+
+<img width="200" alt="支付宝收款码 / Alipay QR Code" src="https://github.com/user-attachments/assets/4650e388-2609-4361-bbab-b5d8137b6027" />
+<img width="200" alt="微信收款码 / WeChat QR Code" src="https://github.com/user-attachments/assets/ee8f766c-e357-4e4e-8897-f2baff58867b" />
+
+> 💖 您的支持是项目持续更新的动力！/ Your support keeps the project going!
+
 ## 📧 联系我们 / Contact Us
 
 - GitHub: [@KingBoyAndGirl](https://github.com/KingBoyAndGirl)

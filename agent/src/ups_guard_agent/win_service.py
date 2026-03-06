@@ -1,11 +1,10 @@
-"""Windows Service wrapper using win32serviceutil (pywin32).
+"""Windows 服务包装器（基于 pywin32）
 
-This module provides a proper Windows service implementation that correctly
-communicates with the Windows Service Control Manager (SCM).
+本模块使用 win32serviceutil.ServiceFramework 实现标准的 Windows 服务接口，
+正确地与 Windows 服务控制管理器（SCM）通信。
 
-When the SCM starts the service, it calls SvcDoRun() which launches the
-AgentClient WebSocket loop. When SCM sends a stop signal, SvcStop() sets
-an event that gracefully terminates the asyncio loop.
+SCM 启动服务时调用 SvcDoRun() 启动 WebSocket 客户端循环。
+SCM 发送停止信号时调用 SvcStop() 优雅地终止异步事件循环。
 """
 import asyncio
 import logging
@@ -26,7 +25,7 @@ _WIN_SERVICE_DESC = "UPS Guard Agent — 远程关机客户端，通过 WebSocke
 
 
 class UPSGuardAgentService(win32serviceutil.ServiceFramework):
-    """Windows Service Framework implementation for UPS Guard Agent."""
+    """Windows 服务框架实现"""
 
     _svc_name_ = _WIN_SERVICE_NAME
     _svc_display_name_ = _WIN_SERVICE_DISPLAY
@@ -38,19 +37,19 @@ class UPSGuardAgentService(win32serviceutil.ServiceFramework):
         self._client = None
 
     # ------------------------------------------------------------------ #
-    #  SCM callbacks
+    #  SCM 回调
     # ------------------------------------------------------------------ #
     def SvcStop(self):
-        """Called by SCM when the service should stop."""
+        """SCM 发送停止信号时调用"""
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
-        logger.info("Service stop requested by SCM")
+        logger.info("收到 SCM 停止信号")
         if self._client:
             self._client.stop()
         win32event.SetEvent(self.hWaitStop)
 
     def SvcDoRun(self):
-        """Called by SCM when the service starts — this is the main entry point."""
-        # Report that we're starting up
+        """SCM 启动服务时调用 — 主入口"""
+        # 报告服务正在启动
         servicemanager.LogMsg(
             servicemanager.EVENTLOG_INFORMATION_TYPE,
             servicemanager.PYS_SERVICE_STARTED,
@@ -60,8 +59,8 @@ class UPSGuardAgentService(win32serviceutil.ServiceFramework):
         try:
             self._main()
         except Exception as e:
-            logger.error(f"Service fatal error: {e}", exc_info=True)
-            servicemanager.LogErrorMsg(f"UPS Guard Agent fatal error: {e}")
+            logger.error(f"服务致命错误: {e}", exc_info=True)
+            servicemanager.LogErrorMsg(f"UPS Guard Agent 致命错误: {e}")
         finally:
             servicemanager.LogMsg(
                 servicemanager.EVENTLOG_INFORMATION_TYPE,
@@ -70,29 +69,29 @@ class UPSGuardAgentService(win32serviceutil.ServiceFramework):
             )
 
     # ------------------------------------------------------------------ #
-    #  Agent logic
+    #  Agent 逻辑
     # ------------------------------------------------------------------ #
     def _main(self):
-        """Initialise logging, load config, and run the WebSocket client."""
-        from ups_guard_agent.config import AgentConfig, CONFIG_FILE, LOG_FILE, STATUS_FILE
+        """初始化日志、加载配置、启动 WebSocket 客户端"""
+        from ups_guard_agent.config import AgentConfig, CONFIG_FILE, get_log_file, cleanup_old_logs
         from ups_guard_agent.commands import handle_command
         from ups_guard_agent.client import AgentClient
 
-        # Setup logging (file only — no console when running as a service)
-        _setup_service_logging(LOG_FILE)
+        # 服务模式仅输出到文件（无控制台）
+        log_file = get_log_file()
+        _setup_service_logging(log_file)
+        cleanup_old_logs()
 
-        logger.info(
-            f"Service starting — Python {sys.version} on {platform.platform()}"
-        )
-        logger.info(f"Config file: {CONFIG_FILE}")
+        logger.info(f"服务启动中 — Python {sys.version}，平台 {platform.platform()}")
+        logger.info(f"配置文件: {CONFIG_FILE}")
 
         cfg = AgentConfig.load()
         if not cfg.server_url or not cfg.token:
-            logger.error("No valid configuration. Service cannot start.")
+            logger.error("配置无效，服务无法启动")
             return
 
         logger.info(
-            f"Starting service: id={cfg.agent_id} name={cfg.agent_name} "
+            f"启动服务: id={cfg.agent_id} name={cfg.agent_name} "
             f"server={cfg.server_url}"
         )
 
@@ -110,17 +109,17 @@ class UPSGuardAgentService(win32serviceutil.ServiceFramework):
 
         _write_status_file("connecting", "", cfg.agent_id, cfg.server_url)
 
-        # Run the async client in an event loop
-        # client.start() loops forever (with reconnect) until client.stop() is called
+        # 启动异步事件循环（client.start() 包含自动重连，直到 client.stop() 被调用）
         asyncio.run(self._client.start())
 
 
 # ------------------------------------------------------------------ #
-#  Helpers
+#  辅助函数
 # ------------------------------------------------------------------ #
 def _setup_service_logging(log_file, level: str = "INFO"):
-    """Configure file-only logging for service mode."""
+    """配置服务模式的日志（仅写文件，无控制台）"""
     from logging.handlers import RotatingFileHandler
+    from ups_guard_agent.config import LOG_MAX_SIZE_MB
 
     log_level = getattr(logging, level.upper(), logging.INFO)
     fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -131,19 +130,19 @@ def _setup_service_logging(log_file, level: str = "INFO"):
     try:
         handler = RotatingFileHandler(
             log_file,
-            maxBytes=5 * 1024 * 1024,
-            backupCount=3,
+            maxBytes=LOG_MAX_SIZE_MB * 1024 * 1024,
+            backupCount=1,
             encoding="utf-8",
         )
         handler.setLevel(log_level)
         handler.setFormatter(logging.Formatter(fmt))
         root.addHandler(handler)
     except Exception:
-        pass  # Service mode — nowhere to report this
+        pass  # 服务模式下无法报告此错误
 
 
 def _write_status_file(status: str, detail: str, agent_id: str, server_url: str):
-    """Write status JSON for the tray companion to read."""
+    """写入状态 JSON 文件，供托盘伴侣进程读取"""
     from ups_guard_agent.config import STATUS_FILE
     from ups_guard_agent.system_info import get_mac_address
     import json
@@ -167,14 +166,13 @@ def _write_status_file(status: str, detail: str, agent_id: str, server_url: str)
 
 
 def run_service_dispatch():
-    """Entry point called from main.py --service.
+    """服务分发入口（由 main.py --service 调用）
 
-    When launched by SCM (as a Windows service), we start the service dispatcher.
-    When launched directly from the command line (e.g. for debugging `--service`),
-    the dispatcher call will fail and we fall back to running the agent directly.
+    在 SCM 环境下启动服务分发器。
+    在命令行直接运行时（如调试 --service），分发器会失败，自动降级为直接运行模式。
     """
     try:
-        # SCM expects clean argv — remove our custom --service flag
+        # SCM 期望干净的 argv — 移除自定义的 --service 参数
         original_argv = sys.argv[:]
         sys.argv = [sys.argv[0]]
 
@@ -182,27 +180,30 @@ def run_service_dispatch():
         servicemanager.PrepareToHostSingle(UPSGuardAgentService)
         servicemanager.StartServiceCtrlDispatcher()
     except Exception as e:
-        # Not under SCM control (e.g. user ran `UPSGuardAgent.exe --service` from terminal)
-        # Restore argv and fall back to running the agent directly
+        # 非 SCM 环境（如用户在终端运行 UPSGuardAgent.exe --service）
+        # 恢复 argv 并降级为直接运行
         sys.argv = original_argv
         _run_direct()
 
 
 def _run_direct():
-    """Fallback: run agent logic directly without SCM (for debugging --service locally)."""
-    from ups_guard_agent.config import AgentConfig, CONFIG_FILE, LOG_FILE
+    """降级方案：不通过 SCM，直接运行 Agent 逻辑（用于命令行调试 --service）"""
+    from ups_guard_agent.config import AgentConfig, CONFIG_FILE, get_log_file, cleanup_old_logs
     from ups_guard_agent.commands import handle_command
     from ups_guard_agent.client import AgentClient
 
-    _setup_service_logging(LOG_FILE)
-    logger.info(f"Direct service mode — Python {sys.version} on {platform.platform()}")
+    log_file = get_log_file()
+    _setup_service_logging(log_file)
+    cleanup_old_logs()
+
+    logger.info(f"直接运行模式 — Python {sys.version}，平台 {platform.platform()}")
 
     cfg = AgentConfig.load()
     if not cfg.server_url or not cfg.token:
-        logger.error("No valid configuration. Cannot start.")
+        logger.error("配置无效，无法启动")
         sys.exit(1)
 
-    logger.info(f"Starting: id={cfg.agent_id} name={cfg.agent_name} server={cfg.server_url}")
+    logger.info(f"启动: id={cfg.agent_id} name={cfg.agent_name} server={cfg.server_url}")
 
     def status_callback(status: str, detail: str = ""):
         _write_status_file(status, detail, cfg.agent_id, cfg.server_url)

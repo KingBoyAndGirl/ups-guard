@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
-# 危险命令黑名单（execute action 安全检查）
+# 危险命令黑名单（execute 动作的安全检查）
 _DANGEROUS_PATTERNS = [
     "rm -rf /",
     "dd if=",
@@ -18,8 +18,14 @@ _DANGEROUS_PATTERNS = [
 
 
 async def _run(cmd: list, operation: str, power_action: bool = False) -> Dict[str, Any]:
-    """使用 asyncio.create_subprocess_exec 执行命令，关机类超时视为成功"""
-    logger.info(f"Running {operation}: cmd={cmd}")
+    """使用 asyncio.create_subprocess_exec 执行命令
+
+    Args:
+        cmd: 命令参数列表
+        operation: 操作名称（用于日志）
+        power_action: 是否为电源操作（关机/重启等），超时时视为成功
+    """
+    logger.info(f"执行 {operation}: cmd={cmd}")
     try:
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -33,29 +39,31 @@ async def _run(cmd: list, operation: str, power_action: bool = False) -> Dict[st
             else:
                 result = {
                     "success": False,
-                    "message": stderr.decode(errors="replace").strip() or f"Exit code {process.returncode}",
+                    "message": stderr.decode(errors="replace").strip() or f"退出码 {process.returncode}",
                 }
-            logger.info(f"{operation} result: success={result['success']} message={result['message']!r}")
+            logger.info(f"{operation} 结果: success={result['success']} message={result['message']!r}")
             return result
         except asyncio.TimeoutError:
             if power_action:
-                logger.info(f"{operation}: timed out, treating as success")
-                return {"success": True, "message": "Command sent (timed out, treated as success)"}
-            logger.warning(f"{operation}: timed out")
-            return {"success": False, "message": f"{operation} timed out"}
+                # 电源操作超时视为成功（系统可能已开始关机）
+                logger.info(f"{operation}: 超时，视为成功（电源操作）")
+                return {"success": True, "message": "命令已发送（超时，视为成功）"}
+            logger.warning(f"{operation}: 执行超时")
+            return {"success": False, "message": f"{operation} 执行超时"}
     except Exception as e:
         if power_action:
-            logger.info(f"{operation}: error ({e}), treating as success")
-            return {"success": True, "message": f"Command sent ({e}, treated as success)"}
-        logger.warning(f"{operation}: exception: {e}")
+            logger.info(f"{operation}: 异常 ({e})，视为成功（电源操作）")
+            return {"success": True, "message": f"命令已发送（{e}，视为成功）"}
+        logger.warning(f"{operation}: 异常: {e}")
         return {"success": False, "message": str(e)}
 
 
 async def _shutdown(params: Dict[str, Any]) -> Dict[str, Any]:
+    """执行关机命令"""
     delay = int(params.get("delay", 60))
-    message = params.get("message", "UPS power lost")
+    message = params.get("message", "UPS 电量不足")
     force = params.get("force", False)
-    logger.info(f"shutdown: delay={delay} message={message!r} force={force}")
+    logger.info(f"关机: delay={delay} message={message!r} force={force}")
     sys = platform.system()
     if sys == "Windows":
         # 默认不加 /f，让预关机命令优雅关闭应用后由 Windows 正常关机
@@ -67,12 +75,13 @@ async def _shutdown(params: Dict[str, Any]) -> Dict[str, Any]:
         cmd = ["sudo", "shutdown", "-h", f"+{delay // 60}"]
     else:
         cmd = ["sudo", "shutdown", "-h", f"+{delay // 60}"]
-    return await _run(cmd, "shutdown", power_action=True)
+    return await _run(cmd, "关机", power_action=True)
 
 
 async def _reboot(params: Dict[str, Any]) -> Dict[str, Any]:
+    """执行重启命令"""
     delay = int(params.get("delay", 0))
-    logger.info(f"reboot: delay={delay}")
+    logger.info(f"重启: delay={delay}")
     sys = platform.system()
     if sys == "Windows":
         cmd = ["shutdown", "/r", "/t", str(delay), "/f"]
@@ -80,11 +89,12 @@ async def _reboot(params: Dict[str, Any]) -> Dict[str, Any]:
         cmd = ["sudo", "shutdown", "-r", "now"]
     else:
         cmd = ["sudo", "reboot"]
-    return await _run(cmd, "reboot", power_action=True)
+    return await _run(cmd, "重启", power_action=True)
 
 
 async def _sleep(_params: Dict[str, Any]) -> Dict[str, Any]:
-    logger.info("sleep requested")
+    """执行睡眠命令"""
+    logger.info("收到睡眠请求")
     sys = platform.system()
     if sys == "Windows":
         cmd = ["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"]
@@ -92,11 +102,12 @@ async def _sleep(_params: Dict[str, Any]) -> Dict[str, Any]:
         cmd = ["pmset", "sleepnow"]
     else:
         cmd = ["systemctl", "suspend"]
-    return await _run(cmd, "sleep", power_action=True)
+    return await _run(cmd, "睡眠", power_action=True)
 
 
 async def _hibernate(_params: Dict[str, Any]) -> Dict[str, Any]:
-    logger.info("hibernate requested")
+    """执行休眠命令"""
+    logger.info("收到休眠请求")
     sys = platform.system()
     if sys == "Windows":
         cmd = ["shutdown", "/h"]
@@ -104,41 +115,43 @@ async def _hibernate(_params: Dict[str, Any]) -> Dict[str, Any]:
         cmd = ["pmset", "sleepnow"]
     else:
         cmd = ["systemctl", "hibernate"]
-    return await _run(cmd, "hibernate", power_action=True)
+    return await _run(cmd, "休眠", power_action=True)
 
 
 async def _cancel_shutdown(_params: Dict[str, Any]) -> Dict[str, Any]:
-    logger.info("cancel_shutdown requested")
+    """取消关机"""
+    logger.info("收到取消关机请求")
     sys = platform.system()
     if sys == "Windows":
         cmd = ["shutdown", "/a"]
     else:
         cmd = ["sudo", "shutdown", "-c"]
-    return await _run(cmd, "cancel_shutdown")
+    return await _run(cmd, "取消关机")
 
 
 async def _execute(params: Dict[str, Any]) -> Dict[str, Any]:
+    """执行自定义命令"""
     import shlex
     command = params.get("command", "")
     if not command:
-        return {"success": False, "message": "No command provided"}
+        return {"success": False, "message": "未提供命令"}
 
-    # 安全检查
+    # 安全检查：拦截危险命令
     for pattern in _DANGEROUS_PATTERNS:
         if pattern.lower() in command.lower():
-            logger.warning(f"Blocked dangerous command: {command}")
-            return {"success": False, "message": f"Command blocked for safety: {pattern}"}
+            logger.warning(f"已拦截危险命令: {command}")
+            return {"success": False, "message": f"命令因安全原因被拦截: {pattern}"}
 
     try:
         cmd = shlex.split(command)
     except ValueError as e:
-        return {"success": False, "message": f"Invalid command syntax: {e}"}
-    return await _run(cmd, "execute")
+        return {"success": False, "message": f"命令语法错误: {e}"}
+    return await _run(cmd, "自定义命令")
 
 
 async def handle_command(action: str, params: Dict[str, Any]) -> Dict[str, Any]:
-    """分发命令入口"""
-    logger.info(f"Dispatching action={action} params={params}")
+    """命令分发入口"""
+    logger.info(f"分发命令: action={action} params={params}")
     handlers = {
         "shutdown": _shutdown,
         "reboot": _reboot,
@@ -149,8 +162,8 @@ async def handle_command(action: str, params: Dict[str, Any]) -> Dict[str, Any]:
     }
     handler = handlers.get(action)
     if handler is None:
-        logger.warning(f"Unknown action: {action}")
-        return {"success": False, "message": f"Unknown action: {action}"}
+        logger.warning(f"未知命令: {action}")
+        return {"success": False, "message": f"未知命令: {action}"}
     result = await handler(params)
-    logger.info(f"Action {action} finished: success={result.get('success')} message={result.get('message', '')!r}")
+    logger.info(f"命令 {action} 完成: success={result.get('success')} message={result.get('message', '')!r}")
     return result

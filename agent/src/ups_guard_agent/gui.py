@@ -44,8 +44,8 @@ class ConfigWindow:
     def _get_logo_path() -> Path:
         """获取 logo.png 的路径"""
         if getattr(sys, "frozen", False):
-            # PyInstaller 打包后，资源在 _MEIPASS 目录
-            base = Path(sys._MEIPASS)  # type: ignore
+            # PyInstaller 打包后，资源在 _MEIPASS/ups_guard_agent/assets/ 目录
+            base = Path(sys._MEIPASS) / "ups_guard_agent"  # type: ignore
         else:
             # 源码运行
             base = Path(__file__).parent
@@ -55,7 +55,7 @@ class ConfigWindow:
         """设置窗口图标（左上角和任务栏）"""
         try:
             logo_path = self._get_logo_path()
-            logger.info(f"Setting window icon from: {logo_path}, exists: {logo_path.exists()}")
+            logger.info(f"设置窗口图标: {logo_path}, 存在: {logo_path.exists()}")
             if logo_path.exists():
                 # 使用 Pillow 加载 PNG 并转换为 PhotoImage
                 from PIL import Image, ImageTk
@@ -78,11 +78,11 @@ class ConfigWindow:
                 if hidden_root:
                     hidden_root.iconphoto(True, self._icon_photo_large, self._icon_photo_medium, self._icon_photo_small)
 
-                logger.info(f"Window icon set successfully from {logo_path}")
+                logger.info(f"窗口图标设置成功: {logo_path}")
             else:
-                logger.warning(f"Logo not found: {logo_path}")
+                logger.warning(f"Logo 文件未找到: {logo_path}")
         except Exception as e:
-            logger.warning(f"Failed to set window icon: {e}")
+            logger.warning(f"设置窗口图标失败: {e}")
 
     def show(self, wait: bool = False):
         """
@@ -99,7 +99,7 @@ class ConfigWindow:
                 try:
                     # 使用 after 在 tkinter 主线程中执行置顶操作
                     _window_instance._root.after(0, _window_instance._bring_to_front)
-                    logger.debug("Config window already open, bringing to front")
+                    logger.debug("设置窗口已打开，置顶显示")
                     return
                 except Exception:
                     # 窗口可能已销毁，继续创建新窗口
@@ -129,7 +129,7 @@ class ConfigWindow:
         from ups_guard_agent.config import AgentConfig
 
         cfg = AgentConfig.load()
-        logger.info("Opening config window")
+        logger.info("正在打开设置窗口")
 
         # 创建主窗口
         root = tk.Tk()
@@ -349,9 +349,9 @@ class ConfigWindow:
                             _poll_win_autostart(True)
                     else:
                         self._status_label.config(text="✅ 已设置开机自启", foreground="green")
-                    logger.info("Autostart enabled via GUI")
+                    logger.info("已通过 GUI 开启开机自启")
                 except Exception as e:
-                    logger.error(f"Failed to install autostart: {e}", exc_info=True)
+                    logger.error(f"安装开机自启失败: {e}", exc_info=True)
                     self._status_label.config(text=f"❌ 设置失败: {e}", foreground="red")
                     self._autostart_var.set(False)
             else:
@@ -372,9 +372,9 @@ class ConfigWindow:
                             _poll_win_autostart(False)
                     else:
                         self._status_label.config(text="✅ 已取消开机自启", foreground="green")
-                    logger.info("Autostart disabled via GUI")
+                    logger.info("已通过 GUI 关闭开机自启")
                 except Exception as e:
-                    logger.error(f"Failed to remove autostart: {e}", exc_info=True)
+                    logger.error(f"移除开机自启失败: {e}", exc_info=True)
                     self._status_label.config(text=f"❌ 取消失败: {e}", foreground="red")
                     self._autostart_var.set(True)
 
@@ -457,14 +457,14 @@ class ConfigWindow:
         id_entry.config(state="readonly")
 
         self._status_label.config(text="✅ 配置已保存", foreground="green")
-        logger.info(f"Config saved: server={server} name={cfg.agent_name}")
+        logger.info(f"配置已保存: server={server} name={cfg.agent_name}")
 
         if self._on_save:
             self._on_save(cfg)
 
         # 首次配置（之前没有有效配置）：保存后自动关闭窗口，让程序继续连接
         if not old_server or not old_token:
-            logger.info("First-time config saved, closing window to start connection")
+            logger.info("首次配置已保存，关闭窗口启动连接")
             self._root.after(500, self._on_window_close)  # 延迟 0.5 秒关闭，让用户看到保存成功提示
 
     # ------------------------------------------------------------------ #
@@ -517,19 +517,19 @@ class ConfigWindow:
 
                 # 先测试连通性（/health 不需要认证）
                 health_url = server.rstrip("/") + "/health"
-                logger.info(f"Testing connection: GET {health_url}")
+                logger.info(f"测试连接: GET {health_url}")
                 t0 = time.monotonic()
                 health_req = urllib.request.Request(health_url, method="GET")
                 with urllib.request.urlopen(health_req, timeout=5) as resp:
                     elapsed_ms = int((time.monotonic() - t0) * 1000)
-                    logger.info(f"Health check: status={resp.status} elapsed={elapsed_ms}ms")
+                    logger.info(f"健康检查: status={resp.status} 耗时={elapsed_ms}ms")
                     health_body = json.loads(resp.read())
                     version = health_body.get("version", "?")
 
                 # 再验证 Token（/api/config 需要认证）
                 config_url = server.rstrip("/") + "/api/config"
                 masked_token = (token[:4] + "****") if token else ""
-                logger.info(f"Testing token: GET {config_url} token={masked_token}")
+                logger.info(f"验证 Token: GET {config_url} token={masked_token}")
                 t1 = time.monotonic()
                 config_req = urllib.request.Request(
                     config_url,
@@ -538,13 +538,13 @@ class ConfigWindow:
                 )
                 with urllib.request.urlopen(config_req, timeout=5) as resp:
                     elapsed_ms = int((time.monotonic() - t1) * 1000)
-                    logger.info(f"Token check: status={resp.status} elapsed={elapsed_ms}ms")
+                    logger.info(f"Token 验证: status={resp.status} 耗时={elapsed_ms}ms")
 
-                logger.info(f"Connection test passed (v{version})")
+                logger.info(f"连接测试通过 (v{version})")
                 self._update_status(f"✅ 连接成功，Token 验证通过 (v{version})", "green")
             except Exception as e:
                 err_msg = str(e)
-                logger.warning(f"Connection test failed: {err_msg}")
+                logger.warning(f"连接测试失败: {err_msg}")
                 # 简化常见错误信息
                 if "urlopen error" in err_msg:
                     err_msg = "无法连接到服务器，请检查地址和网络"
@@ -583,7 +583,7 @@ class ConfigWindow:
             text = self._status_label.cget("text")
             self._root.clipboard_clear()
             self._root.clipboard_append(text)
-            logger.debug(f"Copied to clipboard: {text}")
+            logger.debug(f"已复制到剪贴板: {text}")
 
     # ------------------------------------------------------------------ #
     #  关闭
@@ -592,7 +592,7 @@ class ConfigWindow:
         """关闭窗口时清理资源"""
         global _window_instance
 
-        logger.info("Settings window closed")
+        logger.info("设置窗口已关闭")
         if self._root:
             # 取消定时刷新任务，避免窗口销毁后回调触发
             if self._refresh_after_id is not None:
@@ -615,13 +615,23 @@ class ConfigWindow:
     #  从服务端刷新关机配置
     # ------------------------------------------------------------------ #
     def _schedule_periodic_refresh(self):
-        """立即拉取一次服务端配置，然后每隔 60 秒自动重复，保持显示数据与服务端一致"""
+        """立即拉取一次服务端配置并同步自启状态，然后每隔 60 秒自动重复"""
         self._refresh_server_shutdown_config()
+        self._refresh_autostart_status()
         if self._root:
             # 先取消旧任务，防止重复调度产生多个并发刷新循环
             if self._refresh_after_id is not None:
                 self._root.after_cancel(self._refresh_after_id)
             self._refresh_after_id = self._root.after(60_000, self._schedule_periodic_refresh)
+
+    def _refresh_autostart_status(self):
+        """查询开机自启的真实状态并同步到复选框"""
+        try:
+            actual = is_autostart_enabled()
+            if self._root and hasattr(self, '_autostart_var'):
+                self._root.after(0, lambda: self._autostart_var.set(actual))
+        except Exception:
+            pass
 
     def _refresh_server_shutdown_config(self):
         """后台线程：从服务端 /api/config 拉取关机配置并更新 UI"""
@@ -668,7 +678,7 @@ class ConfigWindow:
                 self._update_srv_delay(str(delay))
                 self._update_srv_message(message or "（未设置）")
                 self._update_srv_info("✅ 已从服务端同步", "green")
-                logger.info(f"Server shutdown config: delay={delay} message={message!r}")
+                logger.info(f"服务端关机配置: delay={delay} message={message!r}")
                 return
 
         self._update_srv_info("⚠️ 服务端未找到本机的关机配置（Agent 需先连接一次服务端）", "darkorange")

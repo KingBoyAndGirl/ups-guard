@@ -1,13 +1,7 @@
 """UPS Guard Agent 入口"""
-import multiprocessing
 import sys
 
-# Windows 下 PyInstaller 打包必须在最开始调用
-if __name__ == "__main__":
-    multiprocessing.freeze_support()
-    # 设置 spawn 模式，避免 fork 导致的问题
-    if sys.platform == "win32":
-        multiprocessing.set_start_method("spawn", force=True)
+
 
 import argparse
 import asyncio
@@ -23,12 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 def setup_logging(level: str = "INFO"):
-    """配置日志：同时输出到控制台和文件
+    """配置日志：同时输出到控制台和带时间戳的日志文件
+
+    每次启动生成新的日志文件，自动清理过期日志。
 
     Args:
         level: 日志等级，可选 DEBUG, INFO, WARNING, ERROR
     """
-    from ups_guard_agent.config import LOG_FILE
+    from ups_guard_agent.config import get_log_file, cleanup_old_logs, LOG_MAX_SIZE_MB
 
     log_level = getattr(logging, level.upper(), logging.INFO)
     fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -43,21 +39,25 @@ def setup_logging(level: str = "INFO"):
     console_handler.setFormatter(logging.Formatter(fmt))
     root_logger.addHandler(console_handler)
 
-    # 文件输出（5MB 轮转，保留 3 个备份）
+    # 文件输出（每次启动新建带时间戳的日志文件，单文件超限时轮转）
     try:
         from logging.handlers import RotatingFileHandler
+        log_file = get_log_file()
         file_handler = RotatingFileHandler(
-            LOG_FILE,
-            maxBytes=5 * 1024 * 1024,
-            backupCount=3,
+            log_file,
+            maxBytes=LOG_MAX_SIZE_MB * 1024 * 1024,
+            backupCount=1,
             encoding="utf-8",
         )
         file_handler.setLevel(log_level)
         file_handler.setFormatter(logging.Formatter(fmt))
         root_logger.addHandler(file_handler)
-        root_logger.info(f"Log file: {LOG_FILE}")
+        root_logger.info(f"日志文件: {log_file}")
+
+        # 清理过期旧日志
+        cleanup_old_logs()
     except Exception as e:
-        root_logger.warning(f"Failed to create log file {LOG_FILE}: {e}")
+        root_logger.warning(f"创建日志文件失败: {e}")
 
 
 def interactive_setup() -> "AgentConfig":  # type: ignore[name-defined]
@@ -116,14 +116,22 @@ def _open_settings(client=None):
             """服务安装/卸载后处理 WebSocket 冲突。
 
             安装服务后：服务进程会启动自己的 WebSocket 客户端，
-            当前进程必须停止自己的客户端，避免两个连接竞争同一个 agent_id。
+            当前进程停止自己的 WebSocket 连接，但不退出进程，
+            保持托盘图标运行并切换为轮询状态文件模式。
             卸载服务后：当前进程需要重新连接。
             """
             if enabled:
-                logger.info("Service installed — stopping current WebSocket client to avoid conflict")
-                client.stop()
+                logger.info("服务已安装 — 停止当前 WebSocket 连接，切换为托盘模式")
+                # 只断开连接，不调用 stop()（stop 会导致 asyncio.run 返回、进程退出）
+                client._running = False
+                if client._ws is not None and client._loop is not None:
+                    try:
+                        import asyncio
+                        asyncio.run_coroutine_threadsafe(client._ws.close(), client._loop)
+                    except Exception:
+                        pass
             else:
-                logger.info("Service removed — reconnecting WebSocket client")
+                logger.info("服务已卸载 — 重新连接 WebSocket")
                 client.reconnect()
 
     win = ConfigWindow(on_save=save_callback, on_autostart_changed=autostart_callback)
@@ -137,10 +145,10 @@ def _is_gui_available() -> bool:
         root = tk.Tk()
         root.withdraw()
         root.destroy()
-        logger.debug("GUI environment available")
+        logger.debug("GUI 环境可用")
         return True
     except Exception as e:
-        logger.debug(f"GUI environment not available: {e}")
+        logger.debug(f"GUI 环境不可用: {e}")
         return False
 
 
@@ -159,9 +167,9 @@ def _write_status_file(status: str, detail: str, agent_id: str, server_url: str)
             "mac_address": get_mac_address(),
         }
         STATUS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        logger.debug(f"Status file written: {status}")
+        logger.debug(f"状态文件已写入: {status}")
     except Exception as e:
-        logger.warning(f"Failed to write status file: {e}")
+        logger.warning(f"写入状态文件失败: {e}")
 
 
 def _run_service_mode(args) -> None:
@@ -178,7 +186,7 @@ def _run_service_mode(args) -> None:
             run_service_dispatch()
             return
         except ImportError:
-            logger.warning("pywin32 not available, falling back to direct mode")
+            logger.warning("pywin32 不可用，降级为直接运行模式")
 
     # 非 Windows 或 pywin32 不可用时的降级方案
     from ups_guard_agent.config import AgentConfig, CONFIG_FILE
@@ -188,8 +196,8 @@ def _run_service_mode(args) -> None:
     log_level = "DEBUG" if args.debug else args.log_level
     setup_logging(log_level)
 
-    logger.info(f"Service mode starting — Python {sys.version} on {platform.platform()}")
-    logger.info(f"Config file: {CONFIG_FILE}")
+    logger.info(f"服务模式启动中 — Python {sys.version}，平台 {platform.platform()}")
+    logger.info(f"配置文件: {CONFIG_FILE}")
 
     cfg = AgentConfig.load()
     if args.server:
@@ -200,10 +208,10 @@ def _run_service_mode(args) -> None:
         cfg.agent_name = args.name
 
     if not cfg.server_url or not cfg.token:
-        logger.error("No valid configuration. Service cannot start.")
+        logger.error("配置无效，服务无法启动")
         sys.exit(1)
 
-    logger.info(f"Starting service: id={cfg.agent_id} name={cfg.agent_name} server={cfg.server_url}")
+    logger.info(f"启动服务: id={cfg.agent_id} name={cfg.agent_name} server={cfg.server_url}")
 
     def status_callback(status: str, detail: str = ""):
         _write_status_file(status, detail, cfg.agent_id, cfg.server_url)
@@ -232,14 +240,23 @@ def _run_tray_only_mode(args) -> None:
     log_level = "DEBUG" if args.debug else args.log_level
     setup_logging(log_level)
 
-    logger.info(f"Tray-only mode starting — Python {sys.version} on {platform.platform()}")
+    # 单实例保护：防止重复启动多个托盘进程
+    global _tray_mutex  # 必须保持引用，防止 GC 释放 Mutex
+    if sys.platform == "win32":
+        import ctypes
+        _tray_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Global\\UPSGuardAgentTray_SingleInstance")
+        if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            logger.info("检测到已有托盘实例在运行，退出")
+            os._exit(0)
+
+    logger.info(f"托盘模式启动中 — Python {sys.version}，平台 {platform.platform()}")
 
     tray = TrayIcon(on_settings=lambda: _open_settings(None))
     tray.start()
-    logger.info("Tray icon started (tray-only mode)")
+    logger.info("托盘图标已启动（仅托盘模式）")
 
     def _poll_status_file():
-        """轮询状态文件，每 2 秒更新一次托盘状态。"""
+        """轮询状态文件，每 2 秒更新一次托盘状态"""
         last_updated_at: str | None = None
         while True:
             try:
@@ -255,13 +272,13 @@ def _run_tray_only_mode(args) -> None:
                 else:
                     tray.update_status("disconnected", "")
             except Exception as e:
-                logger.debug(f"Error reading status file: {e}")
+                logger.debug(f"读取状态文件出错: {e}")
             time.sleep(2)
 
     poll_thread = threading.Thread(target=_poll_status_file, daemon=True)
     poll_thread.start()
 
-    # Keep the main thread alive; tray runs in a daemon thread via TrayIcon.start()
+    # 保持主线程存活；托盘在 TrayIcon.start() 的守护线程中运行
     try:
         while True:
             time.sleep(1)
@@ -289,37 +306,52 @@ def main():
                         default="INFO", help="日志等级（默认 INFO）")
     args = parser.parse_args()
 
-    # Service mode: pure background process, no GUI/tray
+    # 服务模式：纯后台进程，无 GUI/托盘
     if args.service:
         _run_service_mode(args)
         return
 
-    # Tray-only mode: read status file and display tray icon
+    # 托盘模式：读取状态文件并显示托盘图标
     if args.tray_only:
         _run_tray_only_mode(args)
         return
+
+    # --install / --uninstall 是短命令，提权后立即执行完退出，
+    # 不需要创建带时间戳的日志文件（避免每次操作多生成一个日志）
+    if args.install:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        logger.info("正在安装开机自启")
+        from ups_guard_agent.autostart import install_autostart
+        install_autostart()
+        os._exit(0)
+
+    if args.uninstall:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        logger.info("正在移除开机自启")
+        from ups_guard_agent.autostart import remove_autostart
+        remove_autostart()
+        os._exit(0)
 
     # --debug 优先级高于 --log-level
     log_level = "DEBUG" if args.debug else args.log_level
     setup_logging(log_level)
 
+    # ============================================================
+    # 单实例保护：防止重复启动多个托盘进程
+    # ============================================================
+    global _instance_mutex  # 必须保持引用，防止 GC 释放 Mutex
+    if sys.platform == "win32":
+        import ctypes
+        _instance_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Global\\UPSGuardAgent_SingleInstance")
+        if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            logger.info("检测到已有实例在运行，退出")
+            os._exit(0)
+
     logger.info(f"Python {sys.version} on {platform.platform()}")
 
     from ups_guard_agent.config import AgentConfig, CONFIG_FILE
 
-    logger.info(f"Config file: {CONFIG_FILE}")
-
-    if args.install:
-        logger.info("Installing autostart")
-        from ups_guard_agent.autostart import install_autostart
-        install_autostart()
-        sys.exit(0)
-
-    if args.uninstall:
-        logger.info("Removing autostart")
-        from ups_guard_agent.autostart import remove_autostart
-        remove_autostart()
-        sys.exit(0)
+    logger.info(f"配置文件: {CONFIG_FILE}")
 
     # ============================================================
     # 第一步：先创建托盘图标（确保用户始终能看到托盘）
@@ -330,14 +362,14 @@ def main():
             from ups_guard_agent.tray import TrayIcon
             tray = TrayIcon(on_settings=None)
             tray.start()
-            logger.info("Tray icon started")
+            logger.info("托盘图标已启动")
         except Exception as e:
-            logger.warning(f"Tray icon unavailable: {e}")
+            logger.warning(f"托盘图标不可用: {e}")
 
     # ============================================================
     # 第二步：加载 / 获取配置
     # ============================================================
-    logger.info("Loading configuration")
+    logger.info("正在加载配置")
     cfg = AgentConfig.load()
 
     # 命令行参数覆盖配置文件
@@ -350,17 +382,17 @@ def main():
 
     # 首次运行：无有效配置时弹出配置界面
     if not cfg.server_url or not cfg.token:
-        logger.info("No valid config found, starting setup")
+        logger.info("未找到有效配置，进入配置向导")
         if not args.no_gui and _is_gui_available():
-            logger.info("Launching GUI setup")
+            logger.info("启动 GUI 配置向导")
             cfg = _gui_setup()
         else:
-            logger.info("Launching CLI setup")
+            logger.info("启动命令行配置向导")
             cfg = interactive_setup()
 
     # 配置仍然无效，退出
     if not cfg.server_url or not cfg.token:
-        logger.error("No valid configuration. Exiting.")
+        logger.error("配置无效，退出")
         if tray:
             tray.stop()
         sys.exit(1)
@@ -368,7 +400,7 @@ def main():
     # ============================================================
     # 第三步：启动 WebSocket 连接
     # ============================================================
-    logger.info(f"Starting UPS Guard Agent: id={cfg.agent_id} name={cfg.agent_name} server={cfg.server_url}")
+    logger.info(f"启动 UPS Guard Agent: id={cfg.agent_id} name={cfg.agent_name} server={cfg.server_url}")
 
     from ups_guard_agent.commands import handle_command
     from ups_guard_agent.client import AgentClient
@@ -387,6 +419,46 @@ def main():
         tray._on_settings = lambda: _open_settings(client)
 
     asyncio.run(client.start())
+
+    # WebSocket 客户端退出后（如安装了服务模式），保持托盘图标运行
+    # 切换为轮询状态文件模式，与 --tray-only 行为一致
+    if tray and not client._running:
+        from ups_guard_agent.config import STATUS_FILE
+        logger.info("WebSocket 客户端已停止，托盘切换为状态文件轮询模式")
+
+        def _poll_status_file():
+            last_updated_at: str | None = None
+            while True:
+                try:
+                    if STATUS_FILE.exists():
+                        data = json.loads(STATUS_FILE.read_text(encoding="utf-8"))
+                        updated_at = data.get("updated_at")
+                        if updated_at != last_updated_at:
+                            last_updated_at = updated_at
+                            tray.update_status(
+                                data.get("status", "disconnected"),
+                                data.get("detail", ""),
+                            )
+                    else:
+                        tray.update_status("disconnected", "")
+                except Exception:
+                    pass
+                time.sleep(2)
+
+        poll_thread = threading.Thread(target=_poll_status_file, daemon=True)
+        poll_thread.start()
+
+        # 更新托盘菜单：卸载服务后可重新连接
+        def _reopen_settings():
+            _open_settings(None)
+
+        tray._on_settings = _reopen_settings
+
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            tray.stop()
 
 
 if __name__ == "__main__":

@@ -13,6 +13,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Windows GBK 控制台无法输出 Unicode emoji，强制使用 UTF-8
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # ------------------------------------------------------------------ #
 #  路径常量
 # ------------------------------------------------------------------ #
@@ -111,13 +116,7 @@ def main() -> None:
         size_mb = exe.stat().st_size / 1024 / 1024
         print(f"[build] ✅ Done: {exe}  ({size_mb:.1f} MB)")
     else:
-        # Linux / macOS 没有 .exe 后缀
-        binary = DIST_DIR / OUTPUT_NAME
-        if binary.exists():
-            size_mb = binary.stat().st_size / 1024 / 1024
-            print(f"[build] ✅ Done: {binary}  ({size_mb:.1f} MB)")
-        else:
-            print(f"[build] WARNING: expected output not found in {DIST_DIR}", file=sys.stderr)
+        print(f"[build] WARNING: expected output not found in {DIST_DIR}", file=sys.stderr)
 
     # 清理临时 ico
     if ICON_ICO.exists():

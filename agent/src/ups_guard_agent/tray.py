@@ -1,5 +1,6 @@
 """系统托盘图标"""
 import os
+import sys
 import threading
 import logging
 from typing import Callable, Optional
@@ -79,46 +80,23 @@ class TrayIcon:
 
             def quit_action(icon, item):
                 logger.info("退出操作触发")
-                # 先调用用户回调（如 client.stop()）
-                if self._on_quit:
-                    try:
-                        self._on_quit()
-                    except Exception as e:
-                        logger.warning(f"退出回调出错: {e}")
-
-                # 停止后台服务进程（安装时已授予普通用户停止权限，无需 UAC）
-                try:
-                    import platform, time as _time
-                    if platform.system() == "Windows":
-                        import subprocess
-                        result = subprocess.run(
-                            ["sc.exe", "stop", "UPSGuardAgent"],
-                            capture_output=True, text=True, timeout=5,
-                        )
-                        if result.returncode == 0:
-                            logger.info("已发送停止信号，等待服务退出...")
-                            # 等待服务完全停止（最多 10 秒）
-                            for _ in range(20):
-                                _time.sleep(0.5)
-                                qr = subprocess.run(
-                                    ["sc.exe", "query", "UPSGuardAgent"],
-                                    capture_output=True, text=True, timeout=3,
-                                )
-                                if "STOPPED" in qr.stdout:
-                                    logger.info("后台服务已完全停止")
-                                    break
-                        else:
-                            logger.debug(f"停止服务返回: {result.stdout.strip()} {result.stderr.strip()}")
-                except Exception as e:
-                    logger.debug(f"停止服务时出错: {e}")
-
                 # 停止托盘图标
                 try:
                     icon.stop()
                 except Exception:
                     pass
-                # 强制退出当前进程（包括所有线程）
-                logger.info("强制退出进程")
+
+                # 强杀所有同名进程（服务进程 + bootloader 子进程），确保零残留
+                try:
+                    import subprocess
+                    exe_name = os.path.basename(sys.executable)
+                    subprocess.run(
+                        ["taskkill", "/F", "/IM", exe_name],
+                        capture_output=True, timeout=5,
+                    )
+                except Exception:
+                    pass
+
                 os._exit(0)
 
             # 使用当前状态创建图标

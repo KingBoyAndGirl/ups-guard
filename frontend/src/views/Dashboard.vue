@@ -3917,6 +3917,10 @@ watch(latestHookProgress, (progress) => {
   overflow: visible;
 }
 
+.devices-grid :deep(.device-card) {
+  min-height: 220px;
+}
+
 .devices-empty-card {
   max-width: 600px;
   margin: 0 auto;

@@ -2,7 +2,7 @@
 
 ## 概述
 
-LazyCAT UPS Guard 支持通过 Wake On LAN (WOL) 协议来唤醒已关闭的纳管设备。本指南将详细说明如何配置支持 WOL 的设备。
+UPS Guard 支持通过 Wake On LAN (WOL) 协议来唤醒已关闭的纳管设备。本指南将详细说明如何配置支持 WOL 的设备。
 
 ## 前置条件
 
@@ -66,11 +66,11 @@ sudo ethtool -s eth0 wol g
 # 永久启用（添加到 /etc/network/interfaces 或 NetworkManager）
 ```
 
-### 步骤 2: 在 LazyCAT UPS Guard 中配置设备
+### 步骤 2: 在 UPS Guard 中配置设备
 
 #### 支持 WOL 的设备类型
 
-LazyCAT UPS Guard 所有设备类型都支持 Wake On LAN 功能，只需配置 MAC 地址即可：
+UPS Guard 所有设备类型都支持 Wake On LAN 功能，只需配置 MAC 地址即可：
 
 - ✅ **SSH 关机** (Linux/Unix 服务器)
 - ✅ **Windows 远程关机** (Windows 服务器)
@@ -367,8 +367,3 @@ config:
 1. 查看项目 Issues
 2. 提交新的 Issue
 3. 参与项目讨论
-
----
-
-**最后更新**: 2026-02-13
-**版本**: 1.0

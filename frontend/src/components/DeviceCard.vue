@@ -313,6 +313,10 @@ const formatTime = (isoString: string): string => {
   transition: all 0.2s;
   position: relative;
   overflow: visible;
+  /* 使用flex布局优化内部空间分配 */
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
   /* 增强背景可见度 */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
@@ -450,7 +454,7 @@ const formatTime = (isoString: string): string => {
 }
 
 .device-meta {
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
   font-size: 0.75rem;
   color: var(--text-tertiary);
 }
@@ -459,6 +463,7 @@ const formatTime = (isoString: string): string => {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
+  margin-top: auto;
 }
 
 .btn {

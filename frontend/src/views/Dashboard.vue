@@ -3918,7 +3918,7 @@ watch(latestHookProgress, (progress) => {
 }
 
 .devices-grid :deep(.device-card) {
-  min-height: 220px;
+  min-height: 260px;
 }
 
 .devices-empty-card {

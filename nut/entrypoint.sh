@@ -125,55 +125,55 @@ if command -v nut-scanner &> /dev/null; then
             UPS_BRAND="Manual (Forced)"
             RECOMMENDED_DRIVER="$UPS_DRIVER_FORCE"
         else
-            # UPS 品牌识别映射表
-        UPS_BRAND="Unknown"
-        RECOMMENDED_DRIVER=""
-        
-        if [ -n "$VENDOR_ID" ]; then
-            # 转换为小写进行匹配
-            VENDOR_ID_LOWER=$(echo "$VENDOR_ID" | tr '[:upper:]' '[:lower:]')
-            case "$VENDOR_ID_LOWER" in
-                "051d")
-                    UPS_BRAND="APC (施耐德)"
-                    AUTO_BRAND="APC"
-                    RECOMMENDED_DRIVER="usbhid-ups"
-                    ;;
-                "0463")
-                    UPS_BRAND="山特 (SANTAK)"
-                    AUTO_BRAND="SANTAK"
-                    RECOMMENDED_DRIVER="blazer_usb"
-                    ;;
-                "0665")
-                    UPS_BRAND="CyberPower/Ladis"
-                    AUTO_BRAND="CyberPower"
-                    RECOMMENDED_DRIVER="usbhid-ups"
-                    ;;
-                "0764")
-                    UPS_BRAND="华为 (Huawei)"
-                    AUTO_BRAND="Huawei"
-                    RECOMMENDED_DRIVER="nutdrv_qx"
-                    ;;
-                "06da")
-                    UPS_BRAND="伊顿 (Eaton)"
-                    AUTO_BRAND="Eaton"
-                    RECOMMENDED_DRIVER="usbhid-ups"
-                    ;;
-                "04d8")
-                    UPS_BRAND="瓦力方程 (Wali)"
-                    AUTO_BRAND="Wali"
-                    RECOMMENDED_DRIVER="usbhid-ups"
-                    ;;
-                "0001")
-                    UPS_BRAND="山特 (SANTAK Castle)"
-                    AUTO_BRAND="SANTAK"
-                    RECOMMENDED_DRIVER="nutdrv_qx"
-                    ;;
-                *)
-                    UPS_BRAND="Generic (Vendor: $VENDOR_ID)"
-                    AUTO_BRAND="UPS"
-                    RECOMMENDED_DRIVER="usbhid-ups"
-                    ;;
-            esac
+                # UPS 品牌识别映射表
+            UPS_BRAND="Unknown"
+            RECOMMENDED_DRIVER=""
+            
+            if [ -n "$VENDOR_ID" ]; then
+                # 转换为小写进行匹配
+                VENDOR_ID_LOWER=$(echo "$VENDOR_ID" | tr '[:upper:]' '[:lower:]')
+                case "$VENDOR_ID_LOWER" in
+                    "051d")
+                        UPS_BRAND="APC (施耐德)"
+                        AUTO_BRAND="APC"
+                        RECOMMENDED_DRIVER="usbhid-ups"
+                        ;;
+                    "0463")
+                        UPS_BRAND="山特 (SANTAK)"
+                        AUTO_BRAND="SANTAK"
+                        RECOMMENDED_DRIVER="blazer_usb"
+                        ;;
+                    "0665")
+                        UPS_BRAND="CyberPower/Ladis"
+                        AUTO_BRAND="CyberPower"
+                        RECOMMENDED_DRIVER="usbhid-ups"
+                        ;;
+                    "0764")
+                        UPS_BRAND="华为 (Huawei)"
+                        AUTO_BRAND="Huawei"
+                        RECOMMENDED_DRIVER="nutdrv_qx"
+                        ;;
+                    "06da")
+                        UPS_BRAND="伊顿 (Eaton)"
+                        AUTO_BRAND="Eaton"
+                        RECOMMENDED_DRIVER="usbhid-ups"
+                        ;;
+                    "04d8")
+                        UPS_BRAND="瓦力方程 (Wali)"
+                        AUTO_BRAND="Wali"
+                        RECOMMENDED_DRIVER="usbhid-ups"
+                        ;;
+                    "0001")
+                        UPS_BRAND="山特 (SANTAK Castle)"
+                        AUTO_BRAND="SANTAK"
+                        RECOMMENDED_DRIVER="nutdrv_qx"
+                        ;;
+                    *)
+                        UPS_BRAND="Generic (Vendor: $VENDOR_ID)"
+                        AUTO_BRAND="UPS"
+                        RECOMMENDED_DRIVER="usbhid-ups"
+                        ;;
+                esac
             
             echo "═══════════════════════════════════════"
             echo "  UPS 品牌识别"

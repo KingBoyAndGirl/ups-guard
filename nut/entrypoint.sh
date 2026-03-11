@@ -144,12 +144,21 @@ if command -v nut-scanner &> /dev/null; then
                         RECOMMENDED_DRIVER="blazer_usb"
                         ;;
                     "0665")
-                        # VID 0665包含CyberPower、Ladis、山克三个品牌，统一使用nutdrv_qx驱动+极简配置
+                        # VID 0665包含CyberPower、Ladis、山克三个品牌，统一使用nutdrv_qx驱动
                         UPS_BRAND="CyberPower/Ladis/山克"
                         AUTO_BRAND="CyberPower"
                         RECOMMENDED_DRIVER="nutdrv_qx"
                         MINIMAL_CONFIG=true
                         log_info "VID 0665设备统一启用nutdrv_qx驱动+极简兼容配置模式"
+                        
+                        # 添加额定电压参数，让驱动自动计算电量百分比
+                        # 这类设备大多是24V铅酸电池组，驱动会根据电压自动换算电量
+                        cat >> /etc/nut/ups.conf << EOF
+    # 24V铅酸电池额定参数，驱动自动计算电量百分比
+    override.battery.voltage.nominal = 24
+    override.battery.voltage.high = 27.6
+    override.battery.voltage.low = 22
+EOF
                         ;;
                     "0764")
                         UPS_BRAND="华为 (Huawei)"

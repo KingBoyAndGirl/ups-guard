@@ -310,30 +310,62 @@ if [ "$VENDOR_ID_LOWER" = "051d" ]; then
 "
 fi
 
-# 生成 runtimecal 配置
-RUNTIMECAL_OPTS=$(generate_runtimecal_opts "$UPS_DRIVER")
-
-cat > /etc/nut/ups.conf << EOF
-# 由 entrypoint.sh 自动生成
-# Driver discovery result: $UPS_DRIVER on $UPS_PORT
-maxretry = 5
+# ========== 双模式配置生成 ==========
+# 基础配置（所有模式通用）
+BASE_CONF="maxretry = 5
 retrydelay = 3
 user = root
 
 [$UPS_NAME]
     driver = $UPS_DRIVER
     port = $UPS_PORT
-    desc = "$UPS_DESC"
-${EXTRA_DRIVER_OPTS}    # 覆盖 UPS 报告的异常低电量阈值
+    desc = \"$UPS_DESC\"
+${EXTRA_DRIVER_OPTS}    pollinterval = 5"
+
+# 完整配置（自动识别模式）
+FULL_CONF="${BASE_CONF}
+    # 覆盖 UPS 报告的异常低电量阈值
     # 某些 UPS（如 APC BK650M2）会报告 battery.charge.low = 95%，导致误触发关机
     override.battery.charge.low = $BATTERY_CHARGE_LOW
     override.battery.runtime.low = $BATTERY_RUNTIME_LOW
     # 忽略 UPS 硬件报告的 LB (Low Battery) 标志
     # 让 NUT 使用上面的阈值来判断低电量，而不是依赖 UPS 硬件判断
     ignorelb
-    # 增加轮询间隔，减少 USB 通信压力（低电量时 UPS 响应可能变慢）
-    pollinterval = 5
-${RUNTIMECAL_OPTS}
+"
+
+# 强制驱动模式：仅保留最简兼容配置
+if [ -n "$UPS_DRIVER_FORCE" ]; then
+    FINAL_CONF="${BASE_CONF}"
+    
+    # 仅当用户手动设置了非默认低电量阈值时，才添加 override 和 ignorelb
+    if [ "$BATTERY_CHARGE_LOW" != "20" ] || [ "$BATTERY_RUNTIME_LOW" != "180" ]; then
+        FINAL_CONF="${FINAL_CONF}
+    # 自定义低电量阈值
+    override.battery.charge.low = $BATTERY_CHARGE_LOW
+    override.battery.runtime.low = $BATTERY_RUNTIME_LOW
+    ignorelb"
+    fi
+    
+    # 仅当用户手动设置了 RUNTIME_CAL 时，才添加 runtimecal 配置
+    if [ -n "$RUNTIME_CAL" ]; then
+        RUNTIMECAL_OPTS=$(generate_runtimecal_opts "$UPS_DRIVER")
+        FINAL_CONF="${FINAL_CONF}
+${RUNTIMECAL_OPTS}"
+    fi
+else
+    # 自动识别模式：使用完整优化配置
+    FINAL_CONF="${FULL_CONF}"
+    RUNTIMECAL_OPTS=$(generate_runtimecal_opts "$UPS_DRIVER")
+    FINAL_CONF="${FINAL_CONF}
+${RUNTIMECAL_OPTS}"
+fi
+
+# 生成最终 ups.conf
+cat > /etc/nut/ups.conf << EOF
+# 由 entrypoint.sh 自动生成
+# 模式: $(if [ -n "$UPS_DRIVER_FORCE" ]; then echo "强制驱动: ${UPS_DRIVER_FORCE}"; else echo "自动识别"; fi)
+# Driver discovery result: $UPS_DRIVER on $UPS_PORT
+${FINAL_CONF}
 EOF
 
 echo "Generated ups.conf with driver: $UPS_DRIVER"

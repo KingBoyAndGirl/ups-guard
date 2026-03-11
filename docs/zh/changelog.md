@@ -6,7 +6,7 @@
 
 **开发者**： 王.W
 
-**测试环境**：Windows 11 + 懒猫微服 + APC Back-UPS BK650M2-CH + NUT 2.8.3
+**测试环境**：Windows 11 + 懒猫微服 + UPS + NUT 2.8.3
 
 ---
 

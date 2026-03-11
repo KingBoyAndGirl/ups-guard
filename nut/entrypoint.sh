@@ -144,9 +144,12 @@ if command -v nut-scanner &> /dev/null; then
                         RECOMMENDED_DRIVER="blazer_usb"
                         ;;
                     "0665")
-                        UPS_BRAND="CyberPower/Ladis"
+                        # VID 0665包含CyberPower、Ladis、山克三个品牌，统一使用nutdrv_qx驱动+极简配置
+                        UPS_BRAND="CyberPower/Ladis/山克"
                         AUTO_BRAND="CyberPower"
-                        RECOMMENDED_DRIVER="usbhid-ups"
+                        RECOMMENDED_DRIVER="nutdrv_qx"
+                        MINIMAL_CONFIG=true
+                        log_info "VID 0665设备统一启用nutdrv_qx驱动+极简兼容配置模式"
                         ;;
                     "0764")
                         UPS_BRAND="华为 (Huawei)"

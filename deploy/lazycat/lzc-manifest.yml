@@ -65,5 +65,8 @@ services:
       - NUT_PASSWORD=secret
       - UPS_DRIVER=usbhid-ups
       - UPS_PORT=auto
+      # 强制指定驱动（可选，例如：nutdrv_qx, usbhid-ups, blazer_usb）
+      # 当自动选择的驱动不工作时，可以使用此选项强制指定驱动
+      # - UPS_DRIVER_FORCE=nutdrv_qx
       - LZC_API_GATEWAY_ADDRESS=app.cloud.lazycat.app.ups-guard.lzcapp:81
       # API_TOKEN 不再硬编码，首次启动自动生成并持久化到 /data/.api_token

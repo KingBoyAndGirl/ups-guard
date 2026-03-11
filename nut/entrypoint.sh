@@ -64,6 +64,7 @@ generate_runtimecal_opts() {
 # 从环境变量读取配置，提供默认值
 UPS_NAME=${UPS_NAME:-}  # 留空则自动生成
 UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
+UPS_DRIVER_FORCE=${UPS_DRIVER_FORCE:-}  # 强制指定驱动（优先使用）
 UPS_PORT=${UPS_PORT:-auto}
 UPS_DESC=${UPS_DESC:-}  # 留空则自动生成
 UPSD_LISTEN=${UPSD_LISTEN:-0.0.0.0}
@@ -110,7 +111,21 @@ if command -v nut-scanner &> /dev/null; then
         AUTO_SERIAL=$(echo "$SCAN_RESULT" | grep "serial =" | head -1 | sed 's/.*serial = "\([^"]*\)".*/\1/')
         AUTO_MODEL=$(echo "$SCAN_RESULT" | grep "product =" | head -1 | sed 's/.*product = "\([^"]*\)".*/\1/')
 
-        # UPS 品牌识别映射表
+        # 检查是否强制指定驱动
+        if [ -n "$UPS_DRIVER_FORCE" ]; then
+            echo "═══════════════════════════════════════"
+            echo "  ⚠️  强制指定驱动模式"
+            echo "═══════════════════════════════════════"
+            echo "  UPS_DRIVER_FORCE=${UPS_DRIVER_FORCE}"
+            echo "  跳过自动驱动选择，使用强制指定的驱动"
+            echo "═══════════════════════════════════════"
+            
+            # 直接使用强制指定的驱动，跳过品牌识别
+            UPS_DRIVER="$UPS_DRIVER_FORCE"
+            UPS_BRAND="Manual (Forced)"
+            RECOMMENDED_DRIVER="$UPS_DRIVER_FORCE"
+        else
+            # UPS 品牌识别映射表
         UPS_BRAND="Unknown"
         RECOMMENDED_DRIVER=""
         
@@ -183,6 +198,7 @@ if command -v nut-scanner &> /dev/null; then
   "recommended_driver": "$RECOMMENDED_DRIVER"
 }
 BRAND_EOF
+        fi
         fi
         
         # 从扫描结果中提取驱动信息

@@ -38,7 +38,7 @@ generate_runtimecal_opts() {
     # 如果用户没有手动指定 RUNTIME_CAL，根据驱动类型自动决定
     if [ -z "$cal_value" ]; then
         case "$driver_name" in
-            nutdrv_qx|blazer_usb|blazer_ser)
+            nutdrv_qx | blazer_usb | blazer_ser)
                 # 这些驱动的 UPS 通常不报告 battery.runtime，使用保守默认值
                 # 300s@100% 满载，2400s@50% 空载 (适用于大多数家用小型 UPS)
                 cal_value="300,100,2400,50"
@@ -62,11 +62,11 @@ generate_runtimecal_opts() {
 }
 
 # 从环境变量读取配置，提供默认值
-UPS_NAME=${UPS_NAME:-}  # 留空则自动生成
+UPS_NAME=${UPS_NAME:-} # 留空则自动生成
 UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
-UPS_DRIVER_FORCE=${UPS_DRIVER_FORCE:-}  # 强制指定驱动（优先使用）
+UPS_DRIVER_FORCE=${UPS_DRIVER_FORCE:-} # 强制指定驱动（优先使用）
 UPS_PORT=${UPS_PORT:-auto}
-UPS_DESC=${UPS_DESC:-}  # 留空则自动生成
+UPS_DESC=${UPS_DESC:-} # 留空则自动生成
 UPSD_LISTEN=${UPSD_LISTEN:-0.0.0.0}
 UPSD_USER=${UPSD_USER:-admin}
 UPSD_PASSWORD=${UPSD_PASSWORD:-secret}
@@ -99,12 +99,12 @@ AUTO_MODEL=""
 echo "Scanning for UPS devices..."
 if command -v nut-scanner &> /dev/null; then
     # 尝试扫描 USB UPS 设备
-    SCAN_RESULT=$(nut-scanner -U 2>/dev/null || echo "")
-    
+    SCAN_RESULT=$(nut-scanner -U 2> /dev/null || echo "")
+
     if [ -n "$SCAN_RESULT" ]; then
         echo "UPS devices found:"
         echo "$SCAN_RESULT"
-        
+
         # 提取 Vendor ID, Product ID, Serial, Product Name
         VENDOR_ID=$(echo "$SCAN_RESULT" | grep "vendorid =" | head -1 | sed 's/.*vendorid = "\([^"]*\)".*/\1/')
         PRODUCT_ID=$(echo "$SCAN_RESULT" | grep "productid =" | head -1 | sed 's/.*productid = "\([^"]*\)".*/\1/')
@@ -119,16 +119,16 @@ if command -v nut-scanner &> /dev/null; then
             echo "  UPS_DRIVER_FORCE=${UPS_DRIVER_FORCE}"
             echo "  跳过自动驱动选择，使用强制指定的驱动"
             echo "═══════════════════════════════════════"
-            
+
             # 直接使用强制指定的驱动，跳过品牌识别
             UPS_DRIVER="$UPS_DRIVER_FORCE"
             UPS_BRAND="Manual (Forced)"
             RECOMMENDED_DRIVER="$UPS_DRIVER_FORCE"
         else
-                # UPS 品牌识别映射表
+            # UPS 品牌识别映射表
             UPS_BRAND="Unknown"
             RECOMMENDED_DRIVER=""
-            
+
             if [ -n "$VENDOR_ID" ]; then
                 # 转换为小写进行匹配
                 VENDOR_ID_LOWER=$(echo "$VENDOR_ID" | tr '[:upper:]' '[:lower:]')
@@ -174,21 +174,21 @@ if command -v nut-scanner &> /dev/null; then
                         RECOMMENDED_DRIVER="usbhid-ups"
                         ;;
                 esac
-            
-            echo "═══════════════════════════════════════"
-            echo "  UPS 品牌识别"
-            echo "═══════════════════════════════════════"
-            echo "  品牌: $UPS_BRAND"
-            echo "  Vendor ID: $VENDOR_ID"
-            echo "  Product ID: $PRODUCT_ID"
-            echo "  序列号: $AUTO_SERIAL"
-            echo "  型号: $AUTO_MODEL"
-            echo "  推荐驱动: $RECOMMENDED_DRIVER"
-            echo "═══════════════════════════════════════"
-            
-            # 将识别结果写入共享文件，供后端读取
-            mkdir -p /tmp/ups-info
-            cat > /tmp/ups-info/brand.json << BRAND_EOF
+
+                echo "═══════════════════════════════════════"
+                echo "  UPS 品牌识别"
+                echo "═══════════════════════════════════════"
+                echo "  品牌: $UPS_BRAND"
+                echo "  Vendor ID: $VENDOR_ID"
+                echo "  Product ID: $PRODUCT_ID"
+                echo "  序列号: $AUTO_SERIAL"
+                echo "  型号: $AUTO_MODEL"
+                echo "  推荐驱动: $RECOMMENDED_DRIVER"
+                echo "═══════════════════════════════════════"
+
+                # 将识别结果写入共享文件，供后端读取
+                mkdir -p /tmp/ups-info
+                cat > /tmp/ups-info/brand.json << BRAND_EOF
 {
   "brand": "$UPS_BRAND",
   "vendor_id": "$VENDOR_ID",
@@ -198,14 +198,14 @@ if command -v nut-scanner &> /dev/null; then
   "recommended_driver": "$RECOMMENDED_DRIVER"
 }
 BRAND_EOF
+            fi
         fi
-        fi
-        
+
         # 从扫描结果中提取驱动信息
         if echo "$SCAN_RESULT" | grep -q "driver ="; then
             DETECTED_DRIVER=$(echo "$SCAN_RESULT" | grep "driver =" | head -1 | sed 's/.*driver = "\([^"]*\)".*/\1/')
             DETECTED_PORT=$(echo "$SCAN_RESULT" | grep "port =" | head -1 | sed 's/.*port = "\([^"]*\)".*/\1/' || echo "auto")
-            
+
             if [ -n "$DETECTED_DRIVER" ]; then
                 echo "Detected driver: $DETECTED_DRIVER"
 
@@ -336,7 +336,7 @@ FULL_CONF="${BASE_CONF}
 # 强制驱动模式：仅保留最简兼容配置
 if [ -n "$UPS_DRIVER_FORCE" ]; then
     FINAL_CONF="${BASE_CONF}"
-    
+
     # 仅当用户手动设置了非默认低电量阈值时，才添加 override 和 ignorelb
     if [ "$BATTERY_CHARGE_LOW" != "20" ] || [ "$BATTERY_RUNTIME_LOW" != "180" ]; then
         FINAL_CONF="${FINAL_CONF}
@@ -345,7 +345,7 @@ if [ -n "$UPS_DRIVER_FORCE" ]; then
     override.battery.runtime.low = $BATTERY_RUNTIME_LOW
     ignorelb"
     fi
-    
+
     # 仅当用户手动设置了 RUNTIME_CAL 时，才添加 runtimecal 配置
     if [ -n "$RUNTIME_CAL" ]; then
         RUNTIMECAL_OPTS=$(generate_runtimecal_opts "$UPS_DRIVER")
@@ -475,7 +475,7 @@ cleanup_usb_claims() {
             # 只清理 usbfs 残留（容器进程退出后留下的 claim）
             if [ "$driver_name" = "usbfs" ]; then
                 echo "  Unbinding stale usbfs claim on $intf_id"
-                echo "$intf_id" > /sys/bus/usb/drivers/usbfs/unbind 2>/dev/null && {
+                echo "$intf_id" > /sys/bus/usb/drivers/usbfs/unbind 2> /dev/null && {
                     echo "  ✅ Unbound $intf_id from usbfs"
                     cleaned=$((cleaned + 1))
                 } || {
@@ -506,9 +506,9 @@ fix_usb_permissions() {
             for dev_file in "${bus_dir}"*; do
                 if [ -c "$dev_file" ]; then
                     local current_perms
-                    current_perms=$(stat -c '%a' "$dev_file" 2>/dev/null)
+                    current_perms=$(stat -c '%a' "$dev_file" 2> /dev/null)
                     if [ "$current_perms" != "666" ] && [ "$current_perms" != "777" ]; then
-                        chmod 666 "$dev_file" 2>/dev/null && {
+                        chmod 666 "$dev_file" 2> /dev/null && {
                             fixed=$((fixed + 1))
                             log_debug "  Fixed: $dev_file ($current_perms -> 666)"
                         } || {
@@ -534,10 +534,10 @@ echo "  USB 设备检查"
 echo "═══════════════════════════════════════"
 if command -v lsusb &> /dev/null; then
     echo "lsusb 输出:"
-    lsusb 2>/dev/null | grep -i "ups\|apc\|cyber\|eaton\|wali\|ladis\|santak\|04d8\|051d\|0665\|06da\|0463\|0764" || echo "  (未找到已知 UPS 设备)"
+    lsusb 2> /dev/null | grep -i "ups\|apc\|cyber\|eaton\|wali\|ladis\|santak\|04d8\|051d\|0665\|06da\|0463\|0764" || echo "  (未找到已知 UPS 设备)"
 else
     echo "lsusb 不可用，检查 /dev/bus/usb:"
-    ls -la /dev/bus/usb/ 2>/dev/null || echo "  /dev/bus/usb 不存在"
+    ls -la /dev/bus/usb/ 2> /dev/null || echo "  /dev/bus/usb 不存在"
 fi
 echo "═══════════════════════════════════════"
 
@@ -556,7 +556,7 @@ if [ "$UPS_DRIVER" != "dummy-ups" ]; then
                 echo "等待 3 秒后重试..."
                 sleep 3
                 # 尝试停止可能残留的驱动进程
-                timeout 5 upsdrvctl stop >/dev/null 2>&1 || true
+                timeout 5 upsdrvctl stop > /dev/null 2>&1 || true
             fi
         fi
     done
@@ -603,21 +603,21 @@ echo "upsmon PID: $UPSMON_PID"
 
 # UPS 驱动监控和自动重连函数（增强版 v2）
 monitor_ups_driver() {
-    local check_interval=${UPS_MONITOR_INTERVAL:-15}  # 默认每15秒检查一次
-    local base_reconnect_delay=${UPS_RECONNECT_DELAY:-5}  # 基础重连延迟
-    local max_fast_retries=${UPS_MAX_FAST_RETRIES:-5}  # 快速重试次数（默认5次）
-    local usb_scan_interval=${UPS_USB_SCAN_INTERVAL:-10}  # USB 设备不存在时的扫描间隔（默认10秒）
+    local check_interval=${UPS_MONITOR_INTERVAL:-15}     # 默认每15秒检查一次
+    local base_reconnect_delay=${UPS_RECONNECT_DELAY:-5} # 基础重连延迟
+    local max_fast_retries=${UPS_MAX_FAST_RETRIES:-5}    # 快速重试次数（默认5次）
+    local usb_scan_interval=${UPS_USB_SCAN_INTERVAL:-10} # USB 设备不存在时的扫描间隔（默认10秒）
 
     local retry_count=0
     local consecutive_failures=0
     local last_success_time=$(date +%s)
     local usb_device_missing=false  # 标记 USB 设备是否丢失
-    local usb_missing_retry_count=0  # USB 设备丢失后的重试计数
+    local usb_missing_retry_count=0 # USB 设备丢失后的重试计数
 
     # 驱动回退机制变量
-    local driver_fail_count=0           # 当前驱动连续失败计数
-    local max_driver_failures=3         # 触发驱动回退的失败次数阈值
-    local driver_fallback_attempted=false  # 是否已尝试过回退
+    local driver_fail_count=0             # 当前驱动连续失败计数
+    local max_driver_failures=3           # 触发驱动回退的失败次数阈值
+    local driver_fallback_attempted=false # 是否已尝试过回退
 
     echo "═══════════════════════════════════════"
     echo "  UPS 驱动自动监控已启动 (v2)"
@@ -646,7 +646,7 @@ monitor_ups_driver() {
             scan_count=$((scan_count + 1))
 
             # 检查 upsd 进程是否存活
-            if ! kill -0 $UPSD_PID 2>/dev/null; then
+            if ! kill -0 $UPSD_PID 2> /dev/null; then
                 echo "$(date): ⚠️  upsd 进程已退出，尝试重启..."
                 /usr/sbin/upsd -D &
                 UPSD_PID=$!
@@ -654,7 +654,7 @@ monitor_ups_driver() {
             fi
 
             # 检查 upsmon 进程是否存活
-            if ! kill -0 $UPSMON_PID 2>/dev/null; then
+            if ! kill -0 $UPSMON_PID 2> /dev/null; then
                 echo "$(date): ⚠️  upsmon 进程已退出，尝试重启..."
                 /usr/sbin/upsmon -D &
                 UPSMON_PID=$!
@@ -663,7 +663,7 @@ monitor_ups_driver() {
 
             # 定期扫描 USB 设备，检查是否有真实 UPS 连接
             if command -v nut-scanner &> /dev/null; then
-                SCAN_RESULT=$(nut-scanner -U 2>/dev/null || echo "")
+                SCAN_RESULT=$(nut-scanner -U 2> /dev/null || echo "")
                 if [ -n "$SCAN_RESULT" ]; then
                     echo "$(date): 🎉 发现真实 UPS 设备！正在切换..."
                     echo "$SCAN_RESULT"
@@ -682,7 +682,7 @@ monitor_ups_driver() {
                     case "$vendor_lower" in
                         "051d") new_brand="APC" ;;
                         "0463") new_brand="SANTAK" ;;
-                        "0665") new_brand="CyberPower" ;;  # 包含 Ladis
+                        "0665") new_brand="CyberPower" ;; # 包含 Ladis
                         "0764") new_brand="Huawei" ;;
                         "06da") new_brand="Eaton" ;;
                         "04d8") new_brand="Wali" ;;
@@ -701,7 +701,7 @@ monitor_ups_driver() {
 
                     # 停止 dummy 驱动
                     echo "$(date): 🔄 停止 Dummy 驱动..."
-                    timeout 10 upsdrvctl stop >/dev/null 2>&1 || true
+                    timeout 10 upsdrvctl stop > /dev/null 2>&1 || true
 
                     # 生成子驱动配置（APC 需要强制指定 subdriver）
                     local subdriver_opt=""
@@ -747,20 +747,20 @@ SWITCH_EOF
 
                     # 启动真实驱动
                     echo "$(date): 🔄 启动真实 UPS 驱动..."
-                    if timeout 30 upsdrvctl start >/dev/null 2>&1; then
+                    if timeout 30 upsdrvctl start > /dev/null 2>&1; then
                         echo "$(date): ✅ UPS 驱动启动成功"
 
                         # 先强制杀死所有 upsd 和 upsmon 进程
                         echo "$(date): 🔄 停止旧的 upsd/upsmon 进程..."
-                        kill $UPSD_PID 2>/dev/null || true
-                        kill $UPSMON_PID 2>/dev/null || true
+                        kill $UPSD_PID 2> /dev/null || true
+                        kill $UPSMON_PID 2> /dev/null || true
                         # 确保所有 upsmon 进程都被杀死（防止残留）
-                        killall -9 upsmon 2>/dev/null || true
-                        killall -9 upsd 2>/dev/null || true
+                        killall -9 upsmon 2> /dev/null || true
+                        killall -9 upsd 2> /dev/null || true
                         # 清理 FSD 状态文件（防止 upsmon 重启后仍处于 FSD 状态）
-                        rm -f /etc/killpower 2>/dev/null || true
+                        rm -f /etc/killpower 2> /dev/null || true
                         # 删除 PID 文件
-                        rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2>/dev/null || true
+                        rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2> /dev/null || true
                         sleep 2
 
                         # 重启 upsd
@@ -808,7 +808,7 @@ SWITCH_EOF
 
     # 心跳计数器（用于定期输出状态）
     local heartbeat_count=0
-    local heartbeat_interval=60  # 每60次检查输出一次心跳（约5分钟）
+    local heartbeat_interval=60 # 每60次检查输出一次心跳（约5分钟）
     # 标记是否处于 Dummy 等待模式（真实设备断开后自动切换的模式）
     local in_dummy_wait_mode=false
     # Dummy 等待模式下的扫描计数器
@@ -828,12 +828,12 @@ SWITCH_EOF
             dummy_wait_scan_count=$((dummy_wait_scan_count + 1))
 
             # 检查 upsd/upsmon 进程是否存活
-            if ! kill -0 $UPSD_PID 2>/dev/null; then
+            if ! kill -0 $UPSD_PID 2> /dev/null; then
                 log_debug "upsd 进程已退出，尝试重启..."
                 /usr/sbin/upsd -D &
                 UPSD_PID=$!
             fi
-            if ! kill -0 $UPSMON_PID 2>/dev/null; then
+            if ! kill -0 $UPSMON_PID 2> /dev/null; then
                 log_debug "upsmon 进程已退出，尝试重启..."
                 /usr/sbin/upsmon -D &
                 UPSMON_PID=$!
@@ -841,7 +841,7 @@ SWITCH_EOF
 
             # 扫描 USB 设备
             if command -v nut-scanner &> /dev/null; then
-                SCAN_RESULT=$(nut-scanner -U 2>/dev/null || echo "")
+                SCAN_RESULT=$(nut-scanner -U 2> /dev/null || echo "")
                 if [ -n "$SCAN_RESULT" ]; then
                     echo "$(date): 🎉 [Dummy等待] 发现真实 UPS 设备！正在切换..."
                     echo "$SCAN_RESULT"
@@ -859,7 +859,7 @@ SWITCH_EOF
                     case "$(echo "$new_vendor" | tr '[:upper:]' '[:lower:]')" in
                         "051d") new_brand="APC" ;;
                         "0463") new_brand="SANTAK" ;;
-                        "0665") new_brand="CyberPower" ;;  # 包含 Ladis
+                        "0665") new_brand="CyberPower" ;; # 包含 Ladis
                         "0764") new_brand="Huawei" ;;
                         "06da") new_brand="Eaton" ;;
                         "04d8") new_brand="Wali" ;;
@@ -878,13 +878,13 @@ SWITCH_EOF
 
                     # 停止 Dummy 服务
                     echo "$(date): 🔄 停止 Dummy 服务..."
-                    timeout 10 upsdrvctl stop >/dev/null 2>&1 || true
-                    kill $UPSD_PID 2>/dev/null || true
-                    kill $UPSMON_PID 2>/dev/null || true
-                    killall -9 upsd upsmon 2>/dev/null || true
+                    timeout 10 upsdrvctl stop > /dev/null 2>&1 || true
+                    kill $UPSD_PID 2> /dev/null || true
+                    kill $UPSMON_PID 2> /dev/null || true
+                    killall -9 upsd upsmon 2> /dev/null || true
                     # 清理 FSD 状态文件（防止 upsmon 重启后仍处于 FSD 状态）
-                    rm -f /etc/killpower 2>/dev/null || true
-                    rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2>/dev/null || true
+                    rm -f /etc/killpower 2> /dev/null || true
+                    rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2> /dev/null || true
                     sleep 2
 
                     # 更新配置
@@ -929,7 +929,7 @@ DUMMY_WAIT_RECONNECT_EOF
 
                     # 启动真实设备驱动
                     echo "$(date): 🔄 启动真实 UPS 驱动..."
-                    if timeout 30 upsdrvctl start >/dev/null 2>&1; then
+                    if timeout 30 upsdrvctl start > /dev/null 2>&1; then
                         sleep 1
                         /usr/sbin/upsd -D &
                         UPSD_PID=$!
@@ -956,11 +956,11 @@ DUMMY_WAIT_RECONNECT_EOF
                     fi
                 fi
             fi
-            continue  # 继续下一轮 Dummy 等待扫描
+            continue # 继续下一轮 Dummy 等待扫描
         fi
 
         # 检查 UPS 驱动是否能获取数据
-        if upsc ${UPS_NAME}@localhost ups.status >/dev/null 2>&1; then
+        if upsc ${UPS_NAME}@localhost ups.status > /dev/null 2>&1; then
             # 通信正常
             if [ $consecutive_failures -gt 0 ] || [ "$usb_device_missing" = true ]; then
                 local current_time=$(date +%s)
@@ -975,11 +975,11 @@ DUMMY_WAIT_RECONNECT_EOF
             # 通信中断
             consecutive_failures=$((consecutive_failures + 1))
             retry_count=$((retry_count + 1))
-            
+
             # 先扫描 USB 设备，确定是驱动问题还是设备丢失
             local device_found=false
             if command -v nut-scanner &> /dev/null; then
-                SCAN_RESULT=$(nut-scanner -U 2>/dev/null || echo "")
+                SCAN_RESULT=$(nut-scanner -U 2> /dev/null || echo "")
                 if [ -n "$SCAN_RESULT" ]; then
                     device_found=true
                 fi
@@ -994,7 +994,7 @@ DUMMY_WAIT_RECONNECT_EOF
                     echo "$(date): ⚠️  USB UPS 设备未检测到，开始重试..."
                     echo "$(date): 💡 可能原因: USB 断开、设备被占用、Docker 设备映射问题"
                     # 先停止驱动，避免无效查询
-                    timeout 10 upsdrvctl stop >/dev/null 2>&1 || true
+                    timeout 10 upsdrvctl stop > /dev/null 2>&1 || true
                 fi
 
                 usb_missing_retry_count=$((usb_missing_retry_count + 1))
@@ -1009,15 +1009,15 @@ DUMMY_WAIT_RECONNECT_EOF
                     # 输出 /dev/bus/usb 状态（调试用）
                     if [ "$LOG_LEVEL" = "debug" ]; then
                         echo "$(date): [DEBUG] /dev/bus/usb 内容:"
-                        ls -la /dev/bus/usb/ 2>/dev/null || echo "  (无法访问)"
+                        ls -la /dev/bus/usb/ 2> /dev/null || echo "  (无法访问)"
                         for bus in /dev/bus/usb/*/; do
                             if [ -d "$bus" ]; then
-                                echo "  $bus: $(ls "$bus" 2>/dev/null | wc -l) 个设备"
+                                echo "  $bus: $(ls "$bus" 2> /dev/null | wc -l) 个设备"
                             fi
                         done
                     fi
 
-                    continue  # 继续重试
+                    continue # 继续重试
                 fi
 
                 # 超过最大重试次数，切换到 dummy 等待模式
@@ -1026,11 +1026,11 @@ DUMMY_WAIT_RECONNECT_EOF
 
                     # 停止所有 NUT 服务
                     echo "$(date): 🔄 停止所有 NUT 服务..."
-                    timeout 10 upsdrvctl stop >/dev/null 2>&1 || true
-                    kill $UPSD_PID 2>/dev/null || true
-                    kill $UPSMON_PID 2>/dev/null || true
-                    killall -9 upsd upsmon 2>/dev/null || true
-                    rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2>/dev/null || true
+                    timeout 10 upsdrvctl stop > /dev/null 2>&1 || true
+                    kill $UPSD_PID 2> /dev/null || true
+                    kill $UPSMON_PID 2> /dev/null || true
+                    killall -9 upsd upsmon 2> /dev/null || true
+                    rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2> /dev/null || true
                     sleep 2
 
                     # 切换到 dummy 模式配置
@@ -1071,7 +1071,7 @@ DUMMY_WAIT_EOF
 
                     # 重新启动驱动和服务
                     echo "$(date): 🔄 启动 Dummy 模式服务..."
-                    timeout 30 upsdrvctl start >/dev/null 2>&1 || true
+                    timeout 30 upsdrvctl start > /dev/null 2>&1 || true
                     sleep 1
                     /usr/sbin/upsd -D &
                     UPSD_PID=$!
@@ -1110,10 +1110,10 @@ DUMMY_WAIT_EOF
 
             # 停止现有驱动（使用 timeout 防止卡死）
             echo "$(date): 🔄 停止现有驱动..."
-            timeout 10 upsdrvctl stop >/dev/null 2>&1 || true
+            timeout 10 upsdrvctl stop > /dev/null 2>&1 || true
             # 清理可能残留的驱动进程（支持多种驱动类型）
-            killall -9 usbhid-ups blazer_usb nutdrv_qx 2>/dev/null || true
-            rm -f /var/run/nut/usbhid-ups-*.pid /var/run/nut/blazer_usb-*.pid /var/run/nut/nutdrv_qx-*.pid 2>/dev/null || true
+            killall -9 usbhid-ups blazer_usb nutdrv_qx 2> /dev/null || true
+            rm -f /var/run/nut/usbhid-ups-*.pid /var/run/nut/blazer_usb-*.pid /var/run/nut/nutdrv_qx-*.pid 2> /dev/null || true
             # USB-IP 环境下，设备可能需要额外时间重新枚举
             sleep 2
 
@@ -1138,7 +1138,7 @@ DUMMY_WAIT_EOF
                 case "$vendor_lower" in
                     "051d") new_brand="APC" ;;
                     "0463") new_brand="SANTAK" ;;
-                    "0665") new_brand="CyberPower" ;;  # 包含 Ladis
+                    "0665") new_brand="CyberPower" ;; # 包含 Ladis
                     "0764") new_brand="Huawei" ;;
                     "06da") new_brand="Eaton" ;;
                     "04d8") new_brand="Wali" ;;
@@ -1200,24 +1200,24 @@ MONITOR_EOF
                 sleep 5
 
                 # 清理可能残留的驱动进程和锁文件（支持多种驱动类型）
-                killall -9 usbhid-ups blazer_usb nutdrv_qx 2>/dev/null || true
-                rm -f /var/run/nut/usbhid-ups-*.pid /var/run/nut/blazer_usb-*.pid /var/run/nut/nutdrv_qx-*.pid 2>/dev/null || true
+                killall -9 usbhid-ups blazer_usb nutdrv_qx 2> /dev/null || true
+                rm -f /var/run/nut/usbhid-ups-*.pid /var/run/nut/blazer_usb-*.pid /var/run/nut/nutdrv_qx-*.pid 2> /dev/null || true
                 sleep 2
 
                 # 重启驱动（使用 timeout 防止卡死）
                 if timeout 45 upsdrvctl start 2>&1; then
                     echo "$(date): ✅ UPS 驱动重启成功"
-                    driver_fail_count=0  # 重置失败计数
-                    driver_fallback_attempted=false  # 重置回退标记
+                    driver_fail_count=0             # 重置失败计数
+                    driver_fallback_attempted=false # 重置回退标记
 
                     # 强制杀死旧的 upsd/upsmon 进程
-                    kill $UPSD_PID 2>/dev/null || true
-                    kill $UPSMON_PID 2>/dev/null || true
-                    killall -9 upsd 2>/dev/null || true
-                    killall -9 upsmon 2>/dev/null || true
+                    kill $UPSD_PID 2> /dev/null || true
+                    kill $UPSMON_PID 2> /dev/null || true
+                    killall -9 upsd 2> /dev/null || true
+                    killall -9 upsmon 2> /dev/null || true
                     # 清理 FSD 状态文件（防止 upsmon 重启后仍处于 FSD 状态）
-                    rm -f /etc/killpower 2>/dev/null || true
-                    rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2>/dev/null || true
+                    rm -f /etc/killpower 2> /dev/null || true
+                    rm -f /var/run/nut/upsd.pid /run/upsmon.pid 2> /dev/null || true
                     sleep 2
 
                     # 重启 upsd 以加载新配置
@@ -1239,11 +1239,11 @@ MONITOR_EOF
                         # 根据 VID 确定推荐驱动
                         local fallback_driver=""
                         case "$found_vendor" in
-                            "0665") fallback_driver="usbhid-ups" ;;   # CyberPower/Ladis
-                            "051d") fallback_driver="usbhid-ups" ;;   # APC
-                            "06da") fallback_driver="usbhid-ups" ;;   # Eaton/Phoenixtec
-                            "04d8") fallback_driver="usbhid-ups" ;;   # 瓦力方程 (Microchip VID)
-                            *)      fallback_driver="usbhid-ups" ;;   # 默认回退
+                            "0665") fallback_driver="usbhid-ups" ;; # CyberPower/Ladis
+                            "051d") fallback_driver="usbhid-ups" ;; # APC
+                            "06da") fallback_driver="usbhid-ups" ;; # Eaton/Phoenixtec
+                            "04d8") fallback_driver="usbhid-ups" ;; # 瓦力方程 (Microchip VID)
+                            *) fallback_driver="usbhid-ups" ;;      # 默认回退
                         esac
 
                         # 如果品牌推荐的回退驱动与当前驱动相同，
@@ -1297,7 +1297,7 @@ FALLBACK_EOF
             else
                 # 没有 nut-scanner，直接尝试重启驱动
                 echo "$(date): 🔄 尝试重启驱动（无 nut-scanner）..."
-                if timeout 30 upsdrvctl start >/dev/null 2>&1; then
+                if timeout 30 upsdrvctl start > /dev/null 2>&1; then
                     echo "$(date): ✅ UPS 驱动重启成功"
                 else
                     echo "$(date): ❌ UPS 驱动重启失败，将继续重试..."
@@ -1316,12 +1316,12 @@ echo "UPS driver monitor started (PID: $MONITOR_PID)"
 cleanup() {
     echo "Shutting down NUT server..."
     # 停止监控进程
-    kill $MONITOR_PID 2>/dev/null || true
+    kill $MONITOR_PID 2> /dev/null || true
     # 使用 timeout 停止驱动，防止卡死
-    timeout 10 upsdrvctl stop 2>/dev/null || true
+    timeout 10 upsdrvctl stop 2> /dev/null || true
     # 停止 upsd 和 upsmon
-    kill $UPSD_PID 2>/dev/null || true
-    kill $UPSMON_PID 2>/dev/null || true
+    kill $UPSD_PID 2> /dev/null || true
+    kill $UPSMON_PID 2> /dev/null || true
     exit 0
 }
 trap cleanup SIGTERM SIGINT

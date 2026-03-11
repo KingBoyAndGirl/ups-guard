@@ -311,6 +311,9 @@ if [ "$VENDOR_ID_LOWER" = "051d" ]; then
 fi
 
 # ========== 双模式配置生成 ==========
+# 初始化MINIMAL_CONFIG标记（默认false）
+MINIMAL_CONFIG=${MINIMAL_CONFIG:-false}
+
 # 基础配置（所有模式通用）
 BASE_CONF="maxretry = 5
 retrydelay = 3
@@ -333,10 +336,10 @@ FULL_CONF="${BASE_CONF}
     ignorelb
 "
 
-# 强制驱动模式：仅保留最简兼容配置
-if [ -n "$UPS_DRIVER_FORCE" ]; then
+# 强制驱动模式或极简配置设备：仅保留最简兼容配置
+if [ -n "$UPS_DRIVER_FORCE" ] || [ "$MINIMAL_CONFIG" = "true" ]; then
     FINAL_CONF="${BASE_CONF}"
-
+    
     # 仅当用户手动设置了非默认低电量阈值时，才添加 override 和 ignorelb
     if [ "$BATTERY_CHARGE_LOW" != "20" ] || [ "$BATTERY_RUNTIME_LOW" != "180" ]; then
         FINAL_CONF="${FINAL_CONF}
@@ -345,7 +348,7 @@ if [ -n "$UPS_DRIVER_FORCE" ]; then
     override.battery.runtime.low = $BATTERY_RUNTIME_LOW
     ignorelb"
     fi
-
+    
     # 仅当用户手动设置了 RUNTIME_CAL 时，才添加 runtimecal 配置
     if [ -n "$RUNTIME_CAL" ]; then
         RUNTIMECAL_OPTS=$(generate_runtimecal_opts "$UPS_DRIVER")

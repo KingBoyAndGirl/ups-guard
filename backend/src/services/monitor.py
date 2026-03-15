@@ -64,6 +64,16 @@ class UpsMonitor:
         # 响应时间统计
         self._response_times = []  # 今日所有响应时间（毫秒）
         self._stats_date = datetime.now().date()  # 统计日期
+
+        # 电池电量平滑（断电前5分钟避免电压骤降导致的读数跳变）
+        self._battery_on_battery_since: Optional[datetime] = None  # 开始电池供电的时间
+        self._battery_initial_charge: Optional[float] = None  # 断电初始电量
+        self._battery_charge_buffer: list = []  # 电量读数缓冲
+        self._BATTERY_SMOOTH_WINDOW = 300  # 平滑窗口：5分钟（秒）
+
+        # 智能采样间隔
+        self._sample_interval_normal = 300  # 正常状态：5分钟
+        self._sample_interval_active = 10   # 活跃状态（断电/变化）：10秒
     
     def add_status_callback(self, callback: Callable[[UpsData], None]):
         """添加状态变化回调"""
@@ -507,12 +517,16 @@ class UpsMonitor:
                 )
                 output_voltage_estimated = output_voltage is not None
 
+            # 解析电池电量并应用平滑（避免断电初期电压骤降导致的读数跳变）
+            raw_battery_charge = self._parse_float(vars_dict.get("battery.charge"))
+            battery_charge = self._smooth_battery_charge(raw_battery_charge)
+
             # 解析其他数据
             data = UpsData(
                 status=status,
                 status_raw=filtered_status_str,  # 保留过滤后的状态字符串
                 status_flags=filtered_status_flags,  # 过滤后的状态标志位列表
-                battery_charge=self._parse_float(vars_dict.get("battery.charge")),
+                battery_charge=battery_charge,
                 battery_runtime=self._parse_int(vars_dict.get("battery.runtime")),
                 input_voltage=input_voltage,
                 output_voltage=output_voltage,
@@ -583,7 +597,21 @@ class UpsMonitor:
                 ups_backend=self.config.ups_backend if self.config and hasattr(self.config, 'ups_backend') else "nut",
                 last_update=datetime.now()
             )
-            
+
+            # 计算电压质量评分
+            from services.voltage_quality import assess_voltage_quality
+            vq = assess_voltage_quality(
+                input_voltage=input_voltage,
+                input_voltage_nominal=input_voltage_nominal,
+                input_voltage_min=data.input_voltage_min,
+                input_voltage_max=data.input_voltage_max,
+                input_transfer_low=data.input_transfer_low,
+                input_transfer_high=data.input_transfer_high,
+                status_flags=filtered_status_flags,
+            )
+            if vq:
+                data.voltage_quality_score = vq.score
+                data.voltage_quality_grade = vq.grade
 
             return data
         
@@ -741,6 +769,66 @@ class UpsMonitor:
         # 未知状态，返回 None
         return None
 
+    def _smooth_battery_charge(self, raw_charge: Optional[float]) -> Optional[float]:
+        """
+        平滑电池电量读数（仅在断电前5分钟生效）
+
+        铅酸电池特性：接入负载后电压骤降，导致 UPS 固件报告的电量快速下降
+        （如 100% → 96% 在2分钟内），但这不代表真实电量消耗。
+
+        平滑策略：
+        - 断电前5分钟内：使用初始电量和当前读数的加权平均
+        - 权重随时间递减：t=0 时 100% 使用初始值，t=5min 后完全使用实时值
+        - 超过5分钟后：完全使用实时读数
+        """
+        if raw_charge is None:
+            return None
+
+        # 不在电池供电状态，直接返回原始值
+        if self._battery_on_battery_since is None:
+            return raw_charge
+
+        # 初始电量为空，无法平滑
+        if self._battery_initial_charge is None:
+            return raw_charge
+
+        # 计算已过时间
+        elapsed = (datetime.now() - self._battery_on_battery_since).total_seconds()
+
+        # 超过平滑窗口，使用实时值
+        if elapsed >= self._BATTERY_SMOOTH_WINDOW:
+            return round(raw_charge, 1)
+
+        # 缓冲读数用于计算实际下降趋势
+        self._battery_charge_buffer.append(raw_charge)
+
+        # 线性插值：初始值权重随时间递减
+        weight_initial = 1.0 - (elapsed / self._BATTERY_SMOOTH_WINDOW)
+
+        # 平滑后的值 = 初始值 * 权重 + 当前值 * (1 - 权重)
+        smoothed = self._battery_initial_charge * weight_initial + raw_charge * (1 - weight_initial)
+
+        # 不低于当前读数（避免平滑后反而更低）
+        smoothed = max(smoothed, raw_charge)
+
+        logger.debug(
+            f"Battery smoothing: raw={raw_charge}%, initial={self._battery_initial_charge}%, "
+            f"elapsed={elapsed:.0f}s, weight={weight_initial:.2f}, smoothed={smoothed:.1f}%"
+        )
+
+        return round(smoothed, 1)
+
+    def _get_dynamic_sample_interval(self) -> int:
+        """
+        根据 UPS 状态动态调整采样间隔
+
+        - 电池供电/低电量：10秒（高频率）
+        - 市电正常：5分钟（低频率）
+        """
+        if self._current_status in (UpsStatus.ON_BATTERY, UpsStatus.LOW_BATTERY):
+            return self._sample_interval_active
+        return self._sample_interval_normal
+
     def _build_notification_metadata(self, data: UpsData, trigger_reason: str = None, power_lost_duration: int = None) -> dict:
         """
         构建通知元数据
@@ -771,6 +859,19 @@ class UpsMonitor:
     
     async def _on_status_changed(self, old_status: UpsStatus, new_status: UpsStatus, data: UpsData):
         """处理状态变化"""
+
+        # 跟踪电池供电状态（用于电量平滑）
+        if new_status in (UpsStatus.ON_BATTERY, UpsStatus.LOW_BATTERY) and old_status == UpsStatus.ONLINE:
+            # 刚切换到电池供电
+            self._battery_on_battery_since = datetime.now()
+            self._battery_initial_charge = data.battery_charge
+            self._battery_charge_buffer = [data.battery_charge] if data.battery_charge else []
+            logger.info(f"Battery smoothing activated: initial_charge={data.battery_charge}%")
+        elif new_status == UpsStatus.ONLINE and old_status in (UpsStatus.ON_BATTERY, UpsStatus.LOW_BATTERY):
+            # 市电恢复，重置平滑状态
+            self._battery_on_battery_since = None
+            self._battery_initial_charge = None
+            self._battery_charge_buffer = []
 
         try:
             history_service = await get_history_service()
@@ -970,9 +1071,10 @@ class UpsMonitor:
         # 根据状态执行相应操作
         await self._handle_status(data)
         
-        # 定期采样指标
+        # 定期采样指标（根据 UPS 状态动态调整间隔）
         now = datetime.now()
-        if (now - self._last_sample_time).total_seconds() >= self.sample_interval:
+        dynamic_interval = self._get_dynamic_sample_interval()
+        if (now - self._last_sample_time).total_seconds() >= dynamic_interval:
             await self._sample_metrics(data)
             self._last_sample_time = now
         

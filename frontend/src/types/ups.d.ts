@@ -19,6 +19,9 @@ export interface UpsData {
   ups_manufacturer: string | null
   last_update: string
   shutdown: ShutdownStatus
+  // 电压质量
+  voltage_quality_score: number | null
+  voltage_quality_grade: string | null
   // 新增字段
   ups_power_nominal: number | null
   ups_realpower: number | null

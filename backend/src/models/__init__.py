@@ -120,6 +120,9 @@ class UpsData(BaseModel):
     battery_charger_status: Optional[str] = None  # battery.charger.status: charging/discharging/floating/resting
     # 续航时间来源标记：True = 由 runtimecal 软件估算，False/None = UPS 硬件直报
     runtime_estimated: Optional[bool] = None
+    # 电压质量评估
+    voltage_quality_score: Optional[int] = None  # 电压质量评分 0-100
+    voltage_quality_grade: Optional[str] = None  # 电压质量等级 A/B/C/D/F
     # 连接状态
     nut_reconnect_count: Optional[int] = None  # NUT 连接重连次数（用于前端显示）
     # apcupsd 特有参数

@@ -1317,6 +1317,40 @@
               </div>
             </div>
 
+            <!-- 电压质量卡片 -->
+            <div
+              v-else-if="cardId === 'voltage-quality' && upsData.input_voltage"
+              class="card voltage-quality-card draggable-card"
+              :class="{ 'is-dragging': dragState.draggedCardId === 'voltage-quality' }"
+              draggable="true"
+              @dragstart="(e) => handleDragStart(e, 'voltage-quality', colKey)"
+              @dragend="handleDragEnd"
+              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
+            >
+              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+              <h3 class="card-title-compact">⚡ 电压质量</h3>
+              <div class="voltage-quality-content">
+                <div class="vq-score-circle" :class="'vq-grade-' + (upsData.voltage_quality_grade || 'F')">
+                  <div class="vq-score">{{ upsData.voltage_quality_score !== null ? upsData.voltage_quality_score : '?' }}</div>
+                  <div class="vq-grade">{{ upsData.voltage_quality_grade || 'N/A' }}</div>
+                </div>
+                <div class="vq-details">
+                  <div class="vq-item" v-if="volt_deviation">
+                    <span class="vq-label">偏差</span>
+                    <span class="vq-value" :class="volt_deviation_class">{{ volt_deviation }}</span>
+                  </div>
+                  <div class="vq-item">
+                    <span class="vq-label">额定</span>
+                    <span class="vq-value">{{ nominalVoltage }}V</span>
+                  </div>
+                  <div class="vq-item" v-if="input_transfer_low">
+                    <span class="vq-label">切换阈值</span>
+                    <span class="vq-value small">{{ input_transfer_low }} - {{ input_transfer_high }}V</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 设备铭牌卡片 -->
             <div
               v-else-if="cardId === 'device-info' && (upsData.ups_model || upsData.ups_manufacturer || upsData.ups_serial || upsData.ups_mfr_date || upsData.ups_realpower_nominal)"
@@ -1980,6 +2014,29 @@ const inferredNominalVoltage = computed(() => {
   }
   // AC UPS 默认 220V
   return 220
+})
+
+// ========== 电压质量计算 ==========
+const nominalVoltage = computed(() => {
+  return upsData.value?.input_voltage_nominal || inferredNominalVoltage.value || 220
+})
+
+const input_transfer_low = computed(() => upsData.value?.input_transfer_low)
+const input_transfer_high = computed(() => upsData.value?.input_transfer_high)
+
+const volt_deviation = computed(() => {
+  if (!upsData.value?.input_voltage || !nominalVoltage.value) return null
+  const deviation = Math.abs(upsData.value.input_voltage - nominalVoltage.value) / nominalVoltage.value * 100
+  return deviation.toFixed(1) + '%'
+})
+
+const volt_deviation_class = computed(() => {
+  if (!upsData.value?.input_voltage || !nominalVoltage.value) return ''
+  const deviation = Math.abs(upsData.value.input_voltage - nominalVoltage.value) / nominalVoltage.value * 100
+  if (deviation > 15) return 'text-danger'
+  if (deviation > 10) return 'text-warning'
+  if (deviation > 5) return 'text-muted'
+  return ''
 })
 
 // Phase 1 新增计算属性
@@ -5581,6 +5638,70 @@ watch(latestHookProgress, (progress) => {
   height: 0.75rem;
   border-width: 0.1em;
 }
+
+/* 电压质量卡片 */
+.voltage-quality-card .voltage-quality-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.voltage-quality-card .vq-score-circle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 3px solid var(--border-color);
+}
+
+.voltage-quality-card .vq-score-circle.vq-grade-A { border-color: #22c55e; }
+.voltage-quality-card .vq-score-circle.vq-grade-B { border-color: #3b82f6; }
+.voltage-quality-card .vq-score-circle.vq-grade-C { border-color: #f59e0b; }
+.voltage-quality-card .vq-score-circle.vq-grade-D { border-color: #f97316; }
+.voltage-quality-card .vq-score-circle.vq-grade-F { border-color: #ef4444; }
+
+.voltage-quality-card .vq-score {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.voltage-quality-card .vq-grade {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.voltage-quality-card .vq-details {
+  flex: 1;
+}
+
+.voltage-quality-card .vq-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.voltage-quality-card .vq-label {
+  color: var(--text-secondary);
+}
+
+.voltage-quality-card .vq-value {
+  font-weight: 600;
+}
+
+.voltage-quality-card .vq-value.small {
+  font-size: 0.75rem;
+}
+
+.voltage-quality-card .text-danger { color: #ef4444; }
+.voltage-quality-card .text-warning { color: #f59e0b; }
+.voltage-quality-card .text-muted { color: var(--text-secondary); }
 
 @keyframes spinner-border-animation {
   to {

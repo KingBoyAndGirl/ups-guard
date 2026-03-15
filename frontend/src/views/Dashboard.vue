@@ -1551,6 +1551,110 @@
                 原始状态：<code>{{ upsData.status_raw }}</code>
               </div>
             </div>
+
+            <!-- 切换统计卡片（apcupsd 数据） -->
+            <div
+              v-else-if="cardId === 'transfer-stats' && hasTransferData"
+              class="card transfer-stats-card draggable-card"
+              :class="{ 'is-dragging': dragState.draggedCardId === 'transfer-stats' }"
+              draggable="true"
+              @dragstart="(e) => handleDragStart(e, 'transfer-stats', colKey)"
+              @dragend="handleDragEnd"
+              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
+            >
+              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+              <h3 class="card-title-compact">🔄 切换统计</h3>
+              <div class="transfer-stats-grid">
+                <div class="transfer-stat-item" v-if="upsData.transfer_count != null">
+                  <span class="stat-icon">🔀</span>
+                  <div class="stat-details">
+                    <span class="stat-label">历史切换次数</span>
+                    <span class="stat-value">{{ upsData.transfer_count }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.time_on_battery != null">
+                  <span class="stat-icon">⏱️</span>
+                  <div class="stat-details">
+                    <span class="stat-label">本次电池时长</span>
+                    <span class="stat-value">{{ formatDuration(upsData.time_on_battery) }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.cumulative_on_battery != null">
+                  <span class="stat-icon">🔋</span>
+                  <div class="stat-details">
+                    <span class="stat-label">累计电池时长</span>
+                    <span class="stat-value">{{ formatDuration(upsData.cumulative_on_battery) }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.ups_alarm_del">
+                  <span class="stat-icon">🔔</span>
+                  <div class="stat-details">
+                    <span class="stat-label">蜂鸣器策略</span>
+                    <span class="stat-value">{{ formatAlarmDel(upsData.ups_alarm_del) }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.ups_starttime">
+                  <span class="stat-icon">🚀</span>
+                  <div class="stat-details">
+                    <span class="stat-label">守护进程启动</span>
+                    <span class="stat-value">{{ upsData.ups_starttime }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.ups_backend">
+                  <span class="stat-icon">🔌</span>
+                  <div class="stat-details">
+                    <span class="stat-label">通信后端</span>
+                    <span class="stat-value backend-badge" :class="'backend-' + upsData.ups_backend">
+                      {{ upsData.ups_backend === 'apcupsd' ? 'apcupsd' : 'NUT' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 额定参数卡片 -->
+            <div
+              v-else-if="cardId === 'nominal-specs' && hasNominalSpecs"
+              class="card nominal-specs-card draggable-card"
+              :class="{ 'is-dragging': dragState.draggedCardId === 'nominal-specs' }"
+              draggable="true"
+              @dragstart="(e) => handleDragStart(e, 'nominal-specs', colKey)"
+              @dragend="handleDragEnd"
+              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
+            >
+              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+              <h3 class="card-title-compact">📐 额定参数</h3>
+              <div class="nominal-specs-grid">
+                <div class="nominal-item" v-if="upsData.input_voltage_nominal">
+                  <span class="nominal-label">额定输入电压</span>
+                  <span class="nominal-value">{{ upsData.input_voltage_nominal }}V</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.battery_voltage_nominal">
+                  <span class="nominal-label">额定电池电压</span>
+                  <span class="nominal-value">{{ upsData.battery_voltage_nominal }}V</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.ups_realpower_nominal">
+                  <span class="nominal-label">额定有功功率</span>
+                  <span class="nominal-value">{{ upsData.ups_realpower_nominal }}W</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.ups_power_nominal">
+                  <span class="nominal-label">额定视在功率</span>
+                  <span class="nominal-value">{{ upsData.ups_power_nominal }}VA</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.output_current_nominal">
+                  <span class="nominal-label">额定输出电流</span>
+                  <span class="nominal-value">{{ upsData.output_current_nominal }}A</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.battery_charge_low != null">
+                  <span class="nominal-label">低电量阈值</span>
+                  <span class="nominal-value">{{ upsData.battery_charge_low }}%</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.battery_runtime_low != null">
+                  <span class="nominal-label">低续航阈值</span>
+                  <span class="nominal-value">{{ formatDuration(upsData.battery_runtime_low) }}</span>
+                </div>
+              </div>
+            </div>
           </template>
 
           <!-- 列尾部拖拽占位符 -->
@@ -2338,6 +2442,46 @@ const activeFlags = computed(() => {
 const allStatusFlags = computed(() => {
   return [...ALL_STATUS_FLAGS]
 })
+
+// Transfer stats card (apcupsd data)
+const hasTransferData = computed(() => {
+  if (!upsData.value) return false
+  return !!(
+    upsData.value.transfer_count != null ||
+    upsData.value.time_on_battery != null ||
+    upsData.value.cumulative_on_battery != null ||
+    upsData.value.ups_alarm_del ||
+    upsData.value.ups_starttime ||
+    upsData.value.ups_backend
+  )
+})
+
+// Nominal specs card
+const hasNominalSpecs = computed(() => {
+  if (!upsData.value) return false
+  return !!(
+    upsData.value.input_voltage_nominal ||
+    upsData.value.battery_voltage_nominal ||
+    upsData.value.ups_realpower_nominal ||
+    upsData.value.ups_power_nominal ||
+    upsData.value.output_current_nominal ||
+    upsData.value.battery_charge_low != null ||
+    upsData.value.battery_runtime_low != null
+  )
+})
+
+// Format alarm delay
+const formatAlarmDel = (val: string | null | undefined): string => {
+  if (!val) return 'N/A'
+  const map: Record<string, string> = {
+    'No alarm': '无报警延迟',
+    '5sec': '5秒',
+    '30sec': '30秒',
+    '60sec': '60秒',
+    'always': '始终报警'
+  }
+  return map[val] || val
+}
 
 const recentEvents = ref<Event[]>([])
 const metrics = ref<Metric[]>([])
@@ -6013,6 +6157,105 @@ watch(latestHookProgress, (progress) => {
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
 }
 
+/* Transfer Stats Card */
+.transfer-stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.transfer-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-sm);
+}
+
+.transfer-stat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.stat-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.stat-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stat-details .stat-label {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.stat-details .stat-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backend-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+}
+
+.backend-apcupsd {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.backend-nut {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+
+/* Nominal Specs Card */
+.nominal-specs-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.nominal-specs-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.375rem;
+}
+
+.nominal-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.nominal-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.nominal-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
 /* Responsive Design for New Cards */
 @media (max-width: 768px) {
   .device-info-grid,
@@ -6030,6 +6273,10 @@ watch(latestHookProgress, (progress) => {
 
   .gauge-value {
     font-size: 1.25rem;
+  }
+
+  .transfer-stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 

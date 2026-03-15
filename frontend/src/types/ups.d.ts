@@ -65,6 +65,13 @@ export interface UpsData {
   battery_charger_status: string | null
   // 续航时间来源标记：true = runtimecal 软件估算，false/null = UPS 硬件直报
   runtime_estimated: boolean | null
+  // apcupsd 特有参数
+  transfer_count: number | null  // 历史切换次数
+  time_on_battery: number | null  // 本次电池时长(秒)
+  cumulative_on_battery: number | null  // 累计电池时长(秒)
+  ups_alarm_del: string | null  // 蜂鸣器策略
+  ups_backend: string | null  // 当前后端类型: nut/apcupsd
+  ups_starttime: string | null  // UPS 守护进程启动时间
 }
 
 export interface ShutdownStatus {

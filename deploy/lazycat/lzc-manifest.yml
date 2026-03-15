@@ -66,4 +66,7 @@ services:
       - UPS_DRIVER=usbhid-ups
       - UPS_PORT=auto
       - LZC_API_GATEWAY_ADDRESS=app.cloud.lazycat.app.ups-guard.lzcapp:81
+      - UPS_BACKEND=nut
+      - APCUPSD_HOST=127.0.0.1
+      - APCUPSD_PORT=3551
       # API_TOKEN 不再硬编码，首次启动自动生成并持久化到 /data/.api_token

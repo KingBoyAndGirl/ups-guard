@@ -121,6 +121,13 @@ class UpsData(BaseModel):
     runtime_estimated: Optional[bool] = None
     # 连接状态
     nut_reconnect_count: Optional[int] = None  # NUT 连接重连次数（用于前端显示）
+    # apcupsd 特有参数
+    transfer_count: Optional[int] = None  # 历史切换次数 (NUMXFERS)
+    time_on_battery: Optional[int] = None  # 本次电池时长(秒) (TONBATT)
+    cumulative_on_battery: Optional[int] = None  # 累计电池时长(秒) (CUMONBATT)
+    ups_alarm_del: Optional[str] = None  # 蜂鸣器策略 (ALARMDEL)
+    ups_backend: Optional[str] = None  # 当前后端类型: nut/apcupsd
+    ups_starttime: Optional[str] = None  # UPS 守护进程启动时间
 
 
 class Event(BaseModel):

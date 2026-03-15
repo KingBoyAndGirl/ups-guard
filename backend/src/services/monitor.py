@@ -561,6 +561,13 @@ class UpsMonitor:
                 runtime_estimated=vars_dict.get("driver.parameter.runtimecal") is not None,
                 # 连接状态
                 nut_reconnect_count=self._reconnect_count if self._reconnect_count > 0 else None,
+                # apcupsd 特有参数
+                transfer_count=self._parse_int(vars_dict.get("ups.transfer.count")),
+                time_on_battery=self._parse_int(vars_dict.get("ups.time.on_battery")),
+                cumulative_on_battery=self._parse_int(vars_dict.get("ups.cumulative.on_battery")),
+                ups_alarm_del=vars_dict.get("ups.alarm.delay"),
+                ups_starttime=vars_dict.get("ups.starttime"),
+                ups_backend=self.config.ups_backend if self.config and hasattr(self.config, 'ups_backend') else "nut",
                 last_update=datetime.now()
             )
             

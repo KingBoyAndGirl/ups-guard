@@ -140,6 +140,7 @@ export interface NotifyPlugin {
   id: string
   name: string
   description: string
+  help_url?: string
   config_schema: ConfigField[]
 }
 

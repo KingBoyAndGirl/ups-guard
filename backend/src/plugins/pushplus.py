@@ -14,6 +14,7 @@ class PushPlusPlugin(NotifierPlugin):
     plugin_id = "pushplus"
     plugin_name = "PushPlus"
     plugin_description = "通过 PushPlus 发送微信通知"
+    help_url = "https://www.pushplus.plus/doc/guide/api.html"
     
     @classmethod
     def get_config_schema(cls) -> List[Dict[str, Any]]:

@@ -50,6 +50,7 @@ class PluginRegistry:
                 "id": plugin_id,
                 "name": plugin_class.plugin_name,
                 "description": plugin_class.plugin_description,
+                "help_url": getattr(plugin_class, "help_url", ""),
                 "config_schema": plugin_class.get_config_schema()
             }
             for plugin_id, plugin_class in self._plugins.items()

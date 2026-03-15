@@ -14,6 +14,7 @@ class TelegramPlugin(NotifierPlugin):
     plugin_id = "telegram"
     plugin_name = "Telegram Bot"
     plugin_description = "通过 Telegram Bot 发送通知消息"
+    help_url = "https://core.telegram.org/bots#how-do-i-create-a-bot"
     
     @classmethod
     def get_config_schema(cls) -> List[Dict[str, Any]]:

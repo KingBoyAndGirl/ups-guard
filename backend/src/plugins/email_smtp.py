@@ -16,6 +16,7 @@ class EmailSMTPPlugin(NotifierPlugin):
     plugin_id = "email_smtp"
     plugin_name = "邮件 (SMTP)"
     plugin_description = "通过 SMTP 协议发送邮件通知"
+    help_url = ""
     
     @classmethod
     def get_config_schema(cls) -> List[Dict[str, Any]]:

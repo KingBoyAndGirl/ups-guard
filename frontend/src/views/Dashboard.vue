@@ -2777,19 +2777,6 @@ const fetchAnalytics = async () => {
 }
 
 // ========== 快捷操作 ==========
-const muteBeeper = async () => {
-  setQuickActionLoading('mute', true)
-  try {
-    await axios.post('/api/quick/mute-beeper')
-    toast.success('蜂鸣器已静音')
-    await fetchMetrics() // 刷新状态
-  } catch (error: any) {
-    toast.error('静音失败: ' + (error.response?.data?.detail || error.message))
-  } finally {
-    setQuickActionLoading('mute', false)
-  }
-}
-
 const runSelfTest = async (deep: boolean) => {
   setQuickActionLoading(deep ? 'deepTest' : 'quickTest', true)
   try {

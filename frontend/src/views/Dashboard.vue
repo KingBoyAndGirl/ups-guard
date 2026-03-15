@@ -1062,10 +1062,6 @@
                     {{ batteryTemp }}°C
                   </span>
                 </div>
-                <div class="metric-item-compact" v-if="upsData.battery_charge_low !== null && upsData.battery_charge_low !== undefined">
-                  <span class="metric-label">低电量阈值</span>
-                  <span class="metric-value">{{ upsData.battery_charge_low }}%</span>
-                </div>
               </div>
               <div class="battery-sparkline" v-if="metrics.length > 0">
                 <div class="sparkline-header">
@@ -1613,12 +1609,6 @@
               <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
               <h3 class="card-title-compact">🛡️ 保护状态总览</h3>
               <div class="protection-grid">
-                <div v-if="upsData.ups_test_result" class="protection-item">
-                  <span class="protection-label">自检结果</span>
-                  <span class="protection-value" :class="testResultClass">
-                    {{ testResultIcon }} {{ upsData.ups_test_result }}
-                  </span>
-                </div>
                 <div v-if="upsData.input_sensitivity" class="protection-item">
                   <span class="protection-label">输入灵敏度</span>
                   <span class="protection-value protection-editable" @click="openSensitivityEdit" title="点击编辑">
@@ -1631,7 +1621,7 @@
                   <span class="protection-value">{{ formatTransferReason(upsData.input_transfer_reason) }}</span>
                 </div>
                 <div v-if="upsData.battery_charge_low != null" class="protection-item">
-                  <span class="protection-label">低电量</span>
+                  <span class="protection-label">低电量阈值</span>
                   <span class="protection-value">{{ upsData.battery_charge_low }}%</span>
                 </div>
               </div>
@@ -1758,14 +1748,6 @@
                 <div class="nominal-item" v-if="upsData.output_current_nominal">
                   <span class="nominal-label">额定输出电流</span>
                   <span class="nominal-value">{{ upsData.output_current_nominal }}A</span>
-                </div>
-                <div class="nominal-item" v-if="upsData.battery_charge_low != null">
-                  <span class="nominal-label">低电量阈值</span>
-                  <span class="nominal-value">{{ upsData.battery_charge_low }}%</span>
-                </div>
-                <div class="nominal-item" v-if="upsData.battery_runtime_low != null">
-                  <span class="nominal-label">低续航阈值</span>
-                  <span class="nominal-value">{{ formatDuration(upsData.battery_runtime_low) }}</span>
                 </div>
               </div>
             </div>

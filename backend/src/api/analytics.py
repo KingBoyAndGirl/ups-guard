@@ -20,10 +20,50 @@ async def get_battery_analytics():
     
     data = monitor.get_current_data()
     if not data:
-        raise HTTPException(503, "无 UPS 数据")
+        # Monitor 还没数据，直接从 NUT 读取并返回简单分析
+        try:
+            from config import settings
+            from services.nut_client import create_nut_client
+            client = create_nut_client(
+                host=settings.nut_host, port=settings.nut_port,
+                username=settings.nut_username, password=settings.nut_password,
+                ups_name=settings.ups_name or "ups", mock_mode=settings.mock_mode,
+            )
+            await client.connect()
+            vars_dict = await client.list_vars()
+            await client.disconnect()
+            
+            if not vars_dict:
+                return {"error": "无法读取 UPS 数据"}
+            
+            battery_runtime = int(float(vars_dict.get("battery.runtime", "0") or "0"))
+            load_percent = float(vars_dict.get("ups.load", "0") or "0")
+            battery_voltage = float(vars_dict.get("battery.voltage", "0") or "0")
+            ups_status = vars_dict.get("ups.status", "")
+            
+            # 简单负载修正
+            if load_percent < 10: factor = 1.2
+            elif load_percent < 30: factor = 1.0
+            elif load_percent < 60: factor = 0.95
+            else: factor = 0.85
+            
+            predicted_runtime = int(battery_runtime / 60 * factor) if battery_runtime else None
+            
+            return {
+                "estimated_resistance_mohm": None,
+                "resistance_trend": None,
+                "needs_self_test": "No test" in (vars_dict.get("ups.test.result", "") or ""),
+                "days_since_last_test": None,
+                "recommended_test": "quick",
+                "predicted_runtime_minutes": predicted_runtime,
+                "prediction_confidence": "medium" if predicted_runtime else None,
+                "prediction_factors": [f"负载 {load_percent}%"] if load_percent else [],
+            }
+        except Exception as e:
+            logger.error(f"Failed to read UPS directly: {e}")
+            return {"error": str(e)}
     
-    # 获取历史电压数据（需要从数据库查询，这里简化）
-    history_voltages = None  # TODO: 从历史数据中获取最近电压
+    history_voltages = None
     
     result = analyze_battery(
         battery_voltage=data.battery_voltage,

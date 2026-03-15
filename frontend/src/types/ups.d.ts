@@ -12,6 +12,7 @@ export interface UpsData {
   battery_runtime: number | null
   input_voltage: number | null
   output_voltage: number | null
+  output_voltage_estimated: boolean
   load_percent: number | null
   temperature: number | null
   ups_model: string | null

@@ -576,7 +576,10 @@
               </div>
               <div class="report-item">
                 <span class="label">输出电压</span>
-                <span class="value">{{ testReport.current_status.output_voltage }}V</span>
+                <span class="value">
+                  {{ testReport.current_status.output_voltage }}V
+                  <span v-if="testReport.current_status.output_voltage_estimated" class="estimated-badge" title="此值根据输入电压和UPS状态推算">📊</span>
+                </span>
               </div>
             </div>
           </div>
@@ -974,7 +977,10 @@
                 </div>
                 <div class="metric-item-compact">
                   <span class="metric-label">输出电压</span>
-                  <span class="metric-value">{{ upsData.output_voltage ? `${upsData.output_voltage} V` : 'N/A' }}</span>
+                  <span class="metric-value">
+                    {{ upsData.output_voltage ? `${upsData.output_voltage} V` : 'N/A' }}
+                    <span v-if="upsData.output_voltage_estimated" class="estimated-badge" title="此值根据输入电压和UPS状态推算">📊</span>
+                  </span>
                 </div>
                 <div class="metric-item-compact">
                   <span class="metric-label">负载</span>
@@ -6820,5 +6826,13 @@ watch(latestHookProgress, (progress) => {
   font-family: 'Courier New', monospace;
   font-size: 0.875rem;
   color: var(--primary-color);
+}
+
+/* 估算值标识 */
+.estimated-badge {
+  font-size: 0.75rem;
+  cursor: help;
+  margin-left: 0.25rem;
+  vertical-align: middle;
 }
 </style>

@@ -65,6 +65,7 @@ class UpsData(BaseModel):
     battery_runtime: Optional[int] = None  # 剩余运行时间（秒）
     input_voltage: Optional[float] = None  # 输入电压
     output_voltage: Optional[float] = None  # 输出电压
+    output_voltage_estimated: bool = False  # 输出电压是否为估算值
     load_percent: Optional[float] = None  # 负载百分比
     temperature: Optional[float] = None  # 温度
     ups_model: Optional[str] = None  # UPS 型号
@@ -147,6 +148,7 @@ class Metric(BaseModel):
     battery_runtime: Optional[int] = None
     input_voltage: Optional[float] = None
     output_voltage: Optional[float] = None
+    output_voltage_estimated: bool = False  # 输出电压是否为估算值
     load_percent: Optional[float] = None
     temperature: Optional[float] = None
     # Phase 1 扩展采样字段

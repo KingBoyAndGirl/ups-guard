@@ -499,11 +499,13 @@ class UpsMonitor:
             output_voltage = self._parse_float(vars_dict.get("output.voltage"))
             input_voltage = self._parse_float(vars_dict.get("input.voltage"))
             input_voltage_nominal = self._parse_float(vars_dict.get("input.voltage.nominal")) or 230.0
+            output_voltage_estimated = False
 
             if output_voltage is None and input_voltage is not None:
                 output_voltage = self._estimate_output_voltage(
                     input_voltage, input_voltage_nominal, filtered_status_flags
                 )
+                output_voltage_estimated = output_voltage is not None
 
             # 解析其他数据
             data = UpsData(
@@ -514,6 +516,7 @@ class UpsMonitor:
                 battery_runtime=self._parse_int(vars_dict.get("battery.runtime")),
                 input_voltage=input_voltage,
                 output_voltage=output_voltage,
+                output_voltage_estimated=output_voltage_estimated,
                 load_percent=self._parse_float(vars_dict.get("ups.load")),
                 temperature=self._parse_float(vars_dict.get("ups.temperature")),
                 # UPS 型号和制造商：优先使用 device.* 字段，兼容 ups.* 字段

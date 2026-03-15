@@ -1346,22 +1346,10 @@
                   <span class="action-icon">🔇</span>
                   <span class="action-label">静音</span>
                 </button>
-                <button class="action-btn" @click="runSelfTest(false)" title="快速自检">
-                  <span class="action-icon">🔬</span>
-                  <span class="action-label">快速自检</span>
-                </button>
-                <button class="action-btn" @click="runSelfTest(true)" title="深度自检">
-                  <span class="action-icon">🔍</span>
-                  <span class="action-label">深度自检</span>
-                </button>
                 <button v-if="isShutdownPending" class="action-btn action-danger" @click="cancelShutdown" title="取消关机">
                   <span class="action-icon">⏹️</span>
                   <span class="action-label">取消关机</span>
                 </button>
-              </div>
-              <div class="quick-actions-footer" v-if="batteryAnalytics?.needs_self_test">
-                <span class="reminder-icon">⏰</span>
-                <span class="reminder-text">{{ selfTestReminderMessage }}</span>
               </div>
             </div>
 

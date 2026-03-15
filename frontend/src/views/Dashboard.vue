@@ -1317,6 +1317,68 @@
               </div>
             </div>
 
+            <!-- 快捷操作卡片 -->
+            <div
+              v-else-if="cardId === 'quick-actions'"
+              class="card quick-actions-card draggable-card"
+              :class="{ 'is-dragging': dragState.draggedCardId === 'quick-actions' }"
+              draggable="true"
+              @dragstart="(e) => handleDragStart(e, 'quick-actions', colKey)"
+              @dragend="handleDragEnd"
+              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
+            >
+              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+              <h3 class="card-title-compact">⚡ 快捷操作</h3>
+              <div class="quick-actions-grid">
+                <button class="action-btn" @click="muteBeeper" title="静音蜂鸣器">
+                  <span class="action-icon">🔇</span>
+                  <span class="action-label">静音</span>
+                </button>
+                <button class="action-btn" @click="runSelfTest(false)" title="快速自检">
+                  <span class="action-icon">🔬</span>
+                  <span class="action-label">快速自检</span>
+                </button>
+                <button class="action-btn" @click="runSelfTest(true)" title="深度自检">
+                  <span class="action-icon">🔍</span>
+                  <span class="action-label">深度自检</span>
+                </button>
+                <button v-if="isShutdownPending" class="action-btn action-danger" @click="cancelShutdown" title="取消关机">
+                  <span class="action-icon">⏹️</span>
+                  <span class="action-label">取消关机</span>
+                </button>
+              </div>
+              <div class="quick-actions-footer" v-if="batteryAnalytics?.needs_self_test">
+                <span class="reminder-icon">⏰</span>
+                <span class="reminder-text">{{ selfTestReminderMessage }}</span>
+              </div>
+            </div>
+
+            <!-- 电池分析卡片 (内阻+续航预测) -->
+            <div
+              v-else-if="cardId === 'battery-analytics' && batteryAnalytics"
+              class="card battery-analytics-card draggable-card"
+              :class="{ 'is-dragging': dragState.draggedCardId === 'battery-analytics' }"
+              draggable="true"
+              @dragstart="(e) => handleDragStart(e, 'battery-analytics', colKey)"
+              @dragend="handleDragEnd"
+              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
+            >
+              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+              <h3 class="card-title-compact">🔋 电池分析</h3>
+              <div class="analytics-grid">
+                <div class="analytics-item">
+                  <span class="an-label">估算内阻</span>
+                  <span class="an-value" :class="resistance_class">{{ batteryAnalytics.estimated_resistance_mohm }} mΩ</span>
+                  <span class="an-trend">{{ resistance_trend_label }}</span>
+                </div>
+                <div class="analytics-item">
+                  <span class="an-label">AI 续航</span>
+                  <span class="an-value">{{ batteryAnalytics.predicted_runtime_minutes ? formatMinutes(batteryAnalytics.predicted_runtime_minutes) : 'N/A' }}</span>
+                  <span class="an-confidence">置信度: {{ batteryAnalytics.prediction_confidence }}</span>
+                </div>
+              </div>
+            </div>
+
             <!-- 电压质量卡片 -->
             <div
               v-else-if="cardId === 'voltage-quality' && upsData.input_voltage"
@@ -1997,6 +2059,30 @@ const latestBatteryCharge = computed(() => {
 // AC/DC 电压判断阈值：低于此值认为是 DC UPS
 const AC_DC_VOLTAGE_THRESHOLD = 48
 
+// ========== 电池分析计算 ==========
+const batteryAnalyticsData = computed(() => batteryAnalytics.value?.data || {})
+
+const isShutdownPending = computed(() => {
+  return !!shutdownManager.value?.pending_shutdown_time
+})
+
+const resistance_trend_label = computed(() => {
+  const trend = batteryAnalytics.value?.resistance_trend
+  if (!trend) return 'N/A'
+  if (trend === 'stable') return '稳定'
+  if (trend === 'increasing') return '上升 (老化)'
+  if (trend === 'decreasing') return '下降'
+  return trend
+})
+
+const resistance_class = computed(() => {
+  const r = batteryAnalytics.value?.estimated_resistance_mohm
+  if (!r) return ''
+  if (r > 30) return 'text-danger'
+  if (r > 20) return 'text-warning'
+  return ''
+})
+
 // 推断额定电压（当 UPS 不报告 input.voltage.nominal 时）
 const inferredNominalVoltage = computed(() => {
   // UPS 已报告额定电压，不需要推断
@@ -2575,6 +2661,21 @@ const lastDeviceRefresh = ref<Date | null>(null)
 const deviceRefreshInterval = ref<number | null>(null)
 const deviceRefreshIntervalSeconds = ref<number>(60) // 默认 60 秒
 
+// 电池分析数据
+const batteryAnalytics = ref<any>(null)
+
+// 自检提醒消息
+const selfTestReminderMessage = computed(() => {
+  const data = batteryAnalytics.value
+  if (!data?.needs_self_test) return ''
+  const days = data.days_since_last_test || '?'
+  const testType = data.recommended_test === 'deep' ? '深度' : '快速'
+  return `建议进行${testType}自检（距上次已${days}天）`
+})
+
+// 快捷操作状态
+const quickActionLoading = ref<Record<string, boolean>>({})
+
 // 事件详情相关状态
 const showEventDetailDialog = ref(false)
 const currentEvent = ref<Event | null>(null)
@@ -2585,6 +2686,7 @@ const isInitialLoading = ref(true)
 // 定时器引用
 let metricsRefreshTimer: number | null = null
 let predictionsRefreshTimer: number | null = null
+let analyticsRefreshTimer: number | null = null
 let eventsRefreshTimer: number | null = null
 let lastMetricsRefresh = 0  // 上次 metrics 刷新时间戳
 
@@ -2645,6 +2747,62 @@ const fetchPredictions = async () => {
     console.error('Failed to fetch predictions:', error)
     predictions.value = null
   }
+}
+
+// ========== 电池分析 ==========
+const fetchAnalytics = async () => {
+  try {
+    const response = await axios.get('/api/analytics/battery')
+    batteryAnalytics.value = response.data
+  } catch (error) {
+    console.error('Failed to fetch analytics:', error)
+    batteryAnalytics.value = null
+  }
+}
+
+// ========== 快捷操作 ==========
+const muteBeeper = async () => {
+  setQuickActionLoading('mute', true)
+  try {
+    await axios.post('/api/quick/mute-beeper')
+    toast.success('蜂鸣器已静音')
+    await fetchMetrics() // 刷新状态
+  } catch (error: any) {
+    toast.error('静音失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    setQuickActionLoading('mute', false)
+  }
+}
+
+const runSelfTest = async (deep: boolean) => {
+  setQuickActionLoading(deep ? 'deepTest' : 'quickTest', true)
+  try {
+    await axios.post(`/api/quick/test-battery?deep=${deep}`)
+    toast.success(deep ? '深度自检已启动' : '快速自检已启动')
+    await fetchMetrics()
+  } catch (error: any) {
+    toast.error('自检失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    setQuickActionLoading(deep ? 'deepTest' : 'quickTest', false)
+  }
+}
+
+const cancelShutdown = async () => {
+  setQuickActionLoading('cancelShutdown', true)
+  try {
+    await axios.post('/api/quick/cancel-shutdown')
+    toast.success('关机已取消')
+    await fetchMetrics()
+    await fetchShutdownStatus()
+  } catch (error: any) {
+    toast.error('取消失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    setQuickActionLoading('cancelShutdown', false)
+  }
+}
+
+const setQuickActionLoading = (key: string, loading: boolean) => {
+  quickActionLoading.value[key] = loading
 }
 
 // 计算是否有可用的预测
@@ -3943,6 +4101,7 @@ onMounted(async () => {
   fetchRecentEvents()
   fetchMetrics()
   fetchPredictions()  // 获取预测数据
+  fetchAnalytics()    // 获取电池分析数据
   loadConfigAndSetupRefresh()
   loadConfig()  // 加载配置数据（电池日期等）
   fetchDevicesStatus()
@@ -3961,6 +4120,9 @@ onMounted(async () => {
 
   // 定期刷新预测（每3分钟）
   predictionsRefreshTimer = window.setInterval(fetchPredictions, 3 * 60 * 1000)
+
+  // 定期刷新分析（每3分钟）
+  analyticsRefreshTimer = window.setInterval(fetchAnalytics, 3 * 60 * 1000)
 
   // 监听来自App.vue的设备状态变更事件
   const handleDeviceStateChange = () => {
@@ -3987,6 +4149,9 @@ onUnmounted(() => {
   }
   if (predictionsRefreshTimer !== null) {
     clearInterval(predictionsRefreshTimer)
+  }
+  if (analyticsRefreshTimer !== null) {
+    clearInterval(analyticsRefreshTimer)
   }
   if (eventsRefreshTimer !== null) {
     clearInterval(eventsRefreshTimer)
@@ -5702,6 +5867,106 @@ watch(latestHookProgress, (progress) => {
 .voltage-quality-card .text-danger { color: #ef4444; }
 .voltage-quality-card .text-warning { color: #f59e0b; }
 .voltage-quality-card .text-muted { color: var(--text-secondary); }
+
+/* 快捷操作卡片 */
+.quick-actions-card .quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.quick-actions-card .action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-actions-card .action-btn:hover:not(:disabled) {
+  background: var(--primary-light);
+  border-color: var(--primary-color);
+}
+
+.quick-actions-card .action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quick-actions-card .action-btn.action-danger {
+  border-color: #ef4444;
+}
+
+.quick-actions-card .action-btn.action-danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.quick-actions-card .action-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.quick-actions-card .action-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.quick-actions-card .quick-actions-footer {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quick-actions-card .reminder-icon {
+  color: #f59e0b;
+}
+
+/* 电池分析卡片 */
+.battery-analytics-card .analytics-grid {
+  display: flex;
+  gap: 1rem;
+}
+
+.battery-analytics-card .analytics-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.battery-analytics-card .an-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.battery-analytics-card .an-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.battery-analytics-card .an-trend {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.battery-analytics-card .an-confidence {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin-top: 0.25rem;
+}
 
 @keyframes spinner-border-animation {
   to {

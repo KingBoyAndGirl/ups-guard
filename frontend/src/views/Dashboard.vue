@@ -2980,22 +2980,6 @@ const confirmManualShutdown = async () => {
   }
 }
 
-// 取消关机
-const cancelShutdown = async () => {
-  if (isCancelling.value) return
-
-  isCancelling.value = true
-  try {
-    await axios.post('/api/actions/cancel-shutdown')
-    toast.success('关机已取消')
-  } catch (error) {
-    console.error('Failed to cancel shutdown:', error)
-    toast.error('取消关机失败')
-  } finally {
-    isCancelling.value = false
-  }
-}
-
 // UPS 命令执行相关
 const upsCommandLoading = ref(false)
 const beeperToggleLoading = ref(false)

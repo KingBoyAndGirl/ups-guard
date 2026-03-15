@@ -495,6 +495,16 @@ class UpsMonitor:
             )
             filtered_status_str = " ".join(filtered_status_flags) if filtered_status_flags else status_str
 
+            # 解析输出电压（如果 UPS 不直接报告，则根据输入电压和状态推算）
+            output_voltage = self._parse_float(vars_dict.get("output.voltage"))
+            input_voltage = self._parse_float(vars_dict.get("input.voltage"))
+            input_voltage_nominal = self._parse_float(vars_dict.get("input.voltage.nominal")) or 230.0
+
+            if output_voltage is None and input_voltage is not None:
+                output_voltage = self._estimate_output_voltage(
+                    input_voltage, input_voltage_nominal, filtered_status_flags
+                )
+
             # 解析其他数据
             data = UpsData(
                 status=status,
@@ -502,8 +512,8 @@ class UpsMonitor:
                 status_flags=filtered_status_flags,  # 过滤后的状态标志位列表
                 battery_charge=self._parse_float(vars_dict.get("battery.charge")),
                 battery_runtime=self._parse_int(vars_dict.get("battery.runtime")),
-                input_voltage=self._parse_float(vars_dict.get("input.voltage")),
-                output_voltage=self._parse_float(vars_dict.get("output.voltage")),
+                input_voltage=input_voltage,
+                output_voltage=output_voltage,
                 load_percent=self._parse_float(vars_dict.get("ups.load")),
                 temperature=self._parse_float(vars_dict.get("ups.temperature")),
                 # UPS 型号和制造商：优先使用 device.* 字段，兼容 ups.* 字段
@@ -683,7 +693,51 @@ class UpsMonitor:
             return int(float(value))
         except ValueError:
             return None
-    
+
+    def _estimate_output_voltage(
+        self,
+        input_voltage: float,
+        input_voltage_nominal: float,
+        status_flags: list,
+    ) -> Optional[float]:
+        """
+        根据输入电压和 UPS 状态推算输出电压
+
+        适用于不直接报告 output.voltage 的 UPS（如 APC Back-UPS RS 系列）
+
+        推算逻辑（基于线路交互式 UPS 工作原理）：
+        - OL（市电直通）：输出 ≈ 输入，经过 AVR 微调
+        - BOOST（升压）：输入过低时升压至接近额定值
+        - TRIM（降压）：输入过高时降至接近额定值
+        - OB（电池供电）：逆变器输出额定电压
+        """
+        if input_voltage is None:
+            return None
+
+        flags = [f.upper() for f in status_flags]
+
+        # 电池供电模式：逆变器输出稳定的额定电压
+        if "OB" in flags:
+            return input_voltage_nominal
+
+        # BOOST 模式：输入电压过低，UPS 升压
+        # APC 典型升压幅度约 12-15%
+        if "BOOST" in flags:
+            return round(input_voltage * 1.12, 1)
+
+        # TRIM 模式：输入电压过高，UPS 降压
+        # APC 典型降压幅度约 12-15%
+        if "TRIM" in flags:
+            return round(input_voltage * 0.88, 1)
+
+        # OL（在线）无 AVR 调节：输出 ≈ 输入
+        # 线路交互式 UPS 在输入正常时直接旁路，压降可忽略
+        if "OL" in flags:
+            return round(input_voltage, 1)
+
+        # 未知状态，返回 None
+        return None
+
     def _build_notification_metadata(self, data: UpsData, trigger_reason: str = None, power_lost_duration: int = None) -> dict:
         """
         构建通知元数据

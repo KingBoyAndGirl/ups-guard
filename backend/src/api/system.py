@@ -1508,11 +1508,12 @@ async def update_api_token(payload: dict):
     persist_api_token(new_token)
 
     # 2. 热更新中间件中的 Token
-    try:
-        from main import auth_middleware
-        auth_middleware.api_token = new_token
-    except ImportError:
-        logger.warning("Cannot hot-update auth middleware token")
+    from middleware.auth import get_auth_middleware
+    middleware = get_auth_middleware()
+    if middleware:
+        middleware.api_token = new_token
+    else:
+        logger.warning("Cannot hot-update auth middleware: instance not found")
 
     logger.info("API Token updated via Web UI")
 

@@ -578,7 +578,7 @@
                 <span class="label">输出电压</span>
                 <span class="value">
                   {{ testReport.current_status.output_voltage }}V
-                  <span v-if="testReport.current_status.output_voltage_estimated" class="voltage-inferred">(推断)</span>
+                  <span v-if="testReport.current_status.output_voltage_estimated" class="date-source">(推算)</span>
                 </span>
               </div>
             </div>
@@ -979,7 +979,7 @@
                   <span class="metric-label">输出电压</span>
                   <span class="metric-value">
                     {{ upsData.output_voltage ? `${upsData.output_voltage} V` : 'N/A' }}
-                    <span v-if="upsData.output_voltage_estimated" class="voltage-inferred">(推断)</span>
+                    <span v-if="upsData.output_voltage_estimated" class="date-source">(推算)</span>
                   </span>
                 </div>
                 <div class="metric-item-compact">

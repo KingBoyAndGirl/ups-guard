@@ -1991,10 +1991,26 @@ const copyApiToken = async () => {
 }
 
 const saveApiToken = async () => {
+  const tokenToSave = newApiToken.value.trim()
+  
+  // 验证 Token 格式
+  if (!tokenToSave) {
+    toast.error('请先输入或生成 Token')
+    return
+  }
+  if (tokenToSave.length < 8) {
+    toast.error('Token 长度不能少于 8 个字符')
+    return
+  }
+  if (tokenToSave.length > 128) {
+    toast.error('Token 长度不能超过 128 个字符')
+    return
+  }
+
   savingApiToken.value = true
   try {
     const resp = await axios.put('/api/system/api-token', {
-      token: newApiToken.value.trim()
+      token: tokenToSave
     })
 
     const updatedToken = resp.data.token
@@ -2013,7 +2029,13 @@ const saveApiToken = async () => {
 
     toast.success('Token 已更新，请在 Agent 客户端中同步修改')
   } catch (error: any) {
-    toast.error('修改 Token 失败：' + (error.response?.data?.detail || error.message))
+    const detail = error.response?.data?.detail || error.message
+    // 如果是认证失败，提示可能的原因
+    if (error.response?.status === 401) {
+      toast.error('Token 更新失败：当前会话认证已失效，请刷新页面重试')
+    } else {
+      toast.error('修改 Token 失败：' + detail)
+    }
   } finally {
     savingApiToken.value = false
   }

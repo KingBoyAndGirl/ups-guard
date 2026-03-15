@@ -1329,30 +1329,6 @@
               </div>
             </div>
 
-            <!-- 快捷操作卡片 -->
-            <div
-              v-else-if="cardId === 'quick-actions'"
-              class="card quick-actions-card draggable-card"
-              :class="{ 'is-dragging': dragState.draggedCardId === 'quick-actions' }"
-              draggable="true"
-              @dragstart="(e) => handleDragStart(e, 'quick-actions', colKey)"
-              @dragend="handleDragEnd"
-              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
-            >
-              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
-              <h3 class="card-title-compact">⚡ 快捷操作</h3>
-              <div class="quick-actions-grid">
-                <button class="action-btn" @click="muteBeeper" title="静音蜂鸣器">
-                  <span class="action-icon">🔇</span>
-                  <span class="action-label">静音</span>
-                </button>
-                <button v-if="isShutdownPending" class="action-btn action-danger" @click="cancelShutdown" title="取消关机">
-                  <span class="action-icon">⏹️</span>
-                  <span class="action-label">取消关机</span>
-                </button>
-              </div>
-            </div>
-
             <!-- 电池分析卡片 (内阻+续航预测) -->
             <div
               v-else-if="cardId === 'battery-analytics' && batteryAnalytics"
@@ -2655,9 +2631,6 @@ const selfTestReminderMessage = computed(() => {
   return `建议进行${testType}自检（距上次已${days}天）`
 })
 
-// 快捷操作状态
-const quickActionLoading = ref<Record<string, boolean>>({})
-
 // 事件详情相关状态
 const showEventDetailDialog = ref(false)
 const currentEvent = ref<Event | null>(null)
@@ -2742,22 +2715,8 @@ const fetchAnalytics = async () => {
   }
 }
 
-// ========== 快捷操作 ==========
-const runSelfTest = async (deep: boolean) => {
-  setQuickActionLoading(deep ? 'deepTest' : 'quickTest', true)
-  try {
-    await axios.post(`/api/quick/test-battery?deep=${deep}`)
-    toast.success(deep ? '深度自检已启动' : '快速自检已启动')
-    await fetchMetrics()
-  } catch (error: any) {
-    toast.error('自检失败: ' + (error.response?.data?.detail || error.message))
-  } finally {
-    setQuickActionLoading(deep ? 'deepTest' : 'quickTest', false)
-  }
-}
-
 const cancelShutdown = async () => {
-  setQuickActionLoading('cancelShutdown', true)
+  isCancelling.value = true
   try {
     await axios.post('/api/quick/cancel-shutdown')
     toast.success('关机已取消')
@@ -2766,12 +2725,8 @@ const cancelShutdown = async () => {
   } catch (error: any) {
     toast.error('取消失败: ' + (error.response?.data?.detail || error.message))
   } finally {
-    setQuickActionLoading('cancelShutdown', false)
+    isCancelling.value = false
   }
-}
-
-const setQuickActionLoading = (key: string, loading: boolean) => {
-  quickActionLoading.value[key] = loading
 }
 
 // 计算是否有可用的预测
@@ -5890,68 +5845,6 @@ watch(latestHookProgress, (progress) => {
 .voltage-quality-card .text-danger { color: #ef4444; }
 .voltage-quality-card .text-warning { color: #f59e0b; }
 .voltage-quality-card .text-muted { color: var(--text-secondary); }
-
-/* 快捷操作卡片 */
-.quick-actions-card .quick-actions-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
-}
-
-.quick-actions-card .action-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0.75rem 0.5rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.quick-actions-card .action-btn:hover:not(:disabled) {
-  background: var(--primary-light);
-  border-color: var(--primary-color);
-}
-
-.quick-actions-card .action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.quick-actions-card .action-btn.action-danger {
-  border-color: #ef4444;
-}
-
-.quick-actions-card .action-btn.action-danger:hover:not(:disabled) {
-  background: #fef2f2;
-}
-
-.quick-actions-card .action-icon {
-  font-size: 1.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.quick-actions-card .action-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.quick-actions-card .quick-actions-footer {
-  margin-top: 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border-color);
-  font-size: 0.8125rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.quick-actions-card .reminder-icon {
-  color: #f59e0b;
-}
 
 /* 电池分析卡片 */
 .battery-analytics-card .analytics-grid {

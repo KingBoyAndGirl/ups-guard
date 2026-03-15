@@ -4,11 +4,10 @@ from typing import Optional
 import logging
 
 from services.nut_client import create_nut_client
-from config import get_settings
+from config import settings
 
 router = APIRouter(prefix="/api/quick", tags=["quick-actions"])
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 def _get_nut_client():

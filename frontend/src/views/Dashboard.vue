@@ -911,7 +911,7 @@
                 </div>
                 <div class="voltage-info-row" v-if="upsData.input_transfer_reason">
                   <span class="voltage-label">切换原因</span>
-                  <span class="voltage-value-small">{{ upsData.input_transfer_reason }}</span>
+                  <span class="voltage-value-small">{{ formatTransferReason(upsData.input_transfer_reason) }}</span>
                 </div>
                 <div class="voltage-info-row" v-if="upsData.input_sensitivity">
                   <span class="voltage-label">灵敏度</span>
@@ -1510,7 +1510,7 @@
                 </div>
                 <div v-if="upsData.input_transfer_reason" class="protection-item">
                   <span class="protection-label">切换原因</span>
-                  <span class="protection-value">{{ upsData.input_transfer_reason }}</span>
+                  <span class="protection-value">{{ formatTransferReason(upsData.input_transfer_reason) }}</span>
                 </div>
                 <div v-if="upsData.battery_charge_low != null" class="protection-item">
                   <span class="protection-label">低电阈值</span>
@@ -2094,6 +2094,22 @@ const batteryChargerStatusClass = computed(() => {
   }
   return ''
 })
+
+// 切换原因中文映射
+const TRANSFER_REASON_MAP: Record<string, string> = {
+  'input voltage out of range': '输入电压超出范围',
+  'no transfer': '无切换',
+  'high line voltage': '输入电压过高',
+  'low line voltage': '输入电压过低',
+  'self test': '自测切换',
+  'forced': '强制切换',
+}
+
+// 格式化切换原因
+const formatTransferReason = (reason: string | null | undefined): string => {
+  if (!reason) return ''
+  return TRANSFER_REASON_MAP[reason.toLowerCase()] || reason
+}
 
 // 检测是否为占位符日期（2001/01/01 等）
 const isPlaceholderDate = (dateStr: string | null | undefined): boolean => {

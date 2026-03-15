@@ -598,6 +598,15 @@ class UpsMonitor:
                 last_update=datetime.now()
             )
 
+            # 过滤无效的固件占位日期（如 "2001/09/25" 是 APC UPS 默认占位符）
+            INVALID_DATES = {"2001/09/25", "2001-01-01", "1970/01/01"}
+            if data.battery_mfr_date in INVALID_DATES:
+                data.battery_mfr_date = None
+            if data.ups_mfr_date in INVALID_DATES:
+                data.ups_mfr_date = None
+            if data.battery_date in INVALID_DATES:
+                data.battery_date = None
+
             # 计算电压质量评分
             from services.voltage_quality import assess_voltage_quality
             vq = assess_voltage_quality(

@@ -635,10 +635,26 @@
       </div>
     </div>
 
-    <!-- 初始加载状态（最高优先级，3秒内显示） -->
+    <!-- 初始加载状态（骨架屏，最高优先级，3秒内显示） -->
     <div v-if="isInitialLoading" class="loading-panel">
-      <div class="loading-spinner"></div>
-      <p>正在连接 UPS 服务...</p>
+      <div class="skeleton-container">
+        <div class="skeleton-col">
+          <div class="skeleton-card skeleton-card-status"></div>
+          <div class="skeleton-card skeleton-card-predictions"></div>
+          <div class="skeleton-card skeleton-card-short"></div>
+        </div>
+        <div class="skeleton-col">
+          <div class="skeleton-card skeleton-card-voltage"></div>
+          <div class="skeleton-card skeleton-card-battery"></div>
+          <div class="skeleton-card skeleton-card-device"></div>
+        </div>
+        <div class="skeleton-col">
+          <div class="skeleton-card skeleton-card-events"></div>
+          <div class="skeleton-card skeleton-card-short"></div>
+          <div class="skeleton-card skeleton-card-short"></div>
+        </div>
+      </div>
+      <p class="loading-text">正在连接 UPS 服务...</p>
     </div>
 
     <!-- 核心数据区域：三列布局 - 有数据时显示 -->
@@ -4232,26 +4248,76 @@ watch(latestHookProgress, (progress) => {
   justify-content: center;
   min-height: 300px;
   gap: 16px;
+  width: 100%;
+  padding: 2rem;
 }
 
-.loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 3px solid var(--border-color, #e5e7eb);
-  border-top-color: var(--color-primary, #3b82f6);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.loading-text {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-top: 1rem;
+}
+
+/* 骨架屏样式 */
+.skeleton-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ups-card-gap, 1rem);
+  width: 100%;
+  max-width: 1400px;
+  animation: skeleton-fade 1.5s ease-in-out infinite;
+}
+
+.skeleton-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ups-card-gap, 1rem);
+}
+
+.skeleton-card {
+  background: var(--bg-secondary);
+  border-radius: var(--ups-card-radius, 12px);
+  border: 1px solid var(--border-color);
+  opacity: 0.7;
+}
+
+.skeleton-card-status {
+  height: 150px;
+}
+
+.skeleton-card-predictions {
+  height: 120px;
+}
+
+.skeleton-card-voltage {
+  height: 170px;
+}
+
+.skeleton-card-battery {
+  height: 130px;
+}
+
+.skeleton-card-device {
+  height: 180px;
+}
+
+.skeleton-card-events {
+  height: 200px;
+}
+
+.skeleton-card-short {
+  height: 100px;
+}
+
+@keyframes skeleton-fade {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.3; }
 }
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
-}
-
-.loading-panel p {
-  color: var(--text-secondary);
-  font-size: 14px;
 }
 
 

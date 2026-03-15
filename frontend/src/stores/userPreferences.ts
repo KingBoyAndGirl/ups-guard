@@ -9,8 +9,8 @@ import axios from 'axios'
 
 // 默认卡片顺序
 export const DEFAULT_DASHBOARD_CARDS = {
-  col1: ['status', 'shutdown-timeline', 'energy', 'battery-detail', 'voltage-quality', 'events'],
-  col2: ['power-metrics', 'load-gauge', 'battery-voltage', 'battery-status', 'environment', 'self-test', 'nominal-specs'],
+  col1: ['status', 'shutdown-timeline', 'energy', 'battery-detail', 'battery-analytics', 'voltage-quality', 'events'],
+  col2: ['power-metrics', 'load-gauge', 'battery-voltage', 'battery-status', 'environment', 'self-test', 'quick-actions', 'nominal-specs'],
   col3: ['power-chart', 'device-info', 'battery-life', 'transfer-stats', 'protection-overview', 'status-flags', 'predictions']
 }
 

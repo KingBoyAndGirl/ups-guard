@@ -578,7 +578,7 @@
                 <span class="label">输出电压</span>
                 <span class="value">
                   {{ testReport.current_status.output_voltage }}V
-                  <span v-if="testReport.current_status.output_voltage_estimated" class="date-source">(推算)</span>
+                  <span v-if="testReport.current_status.output_voltage_estimated" class="voltage-source-badge estimated" title="根据输入电压和UPS状态推算">📊 推断</span>
                 </span>
               </div>
             </div>
@@ -925,7 +925,7 @@
                   <span class="voltage-label">额定电压</span>
                   <span class="voltage-value-small">
                     {{ upsData.input_voltage_nominal || inferredNominalVoltage }} V
-                    <span v-if="!upsData.input_voltage_nominal && inferredNominalVoltage" class="voltage-inferred">(推断)</span>
+                    <span v-if="!upsData.input_voltage_nominal && inferredNominalVoltage" class="voltage-source-badge estimated" title="根据输入电压自动推断">📊 推断</span>
                   </span>
                 </div>
                 <div class="voltage-info-row" v-if="upsData.input_transfer_reason">
@@ -995,7 +995,7 @@
                   <span class="metric-label">输出电压</span>
                   <span class="metric-value">
                     {{ upsData.output_voltage ? `${upsData.output_voltage} V` : 'N/A' }}
-                    <span v-if="upsData.output_voltage_estimated" class="date-source">(推算)</span>
+                    <span v-if="upsData.output_voltage_estimated" class="voltage-source-badge estimated" title="根据输入电压和UPS状态推算">📊 推断</span>
                   </span>
                 </div>
                 <div class="metric-item-compact">
@@ -4545,6 +4545,26 @@ watch(latestHookProgress, (progress) => {
   background: rgba(16, 185, 129, 0.15);
   color: #059669;
   border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* 电压来源标记（与续航来源标记风格一致） */
+.voltage-source-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  padding: 0.0625rem 0.3rem;
+  border-radius: 0.25rem;
+  margin-left: 0.25rem;
+  font-weight: 500;
+  cursor: help;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.voltage-source-badge.estimated {
+  background: rgba(139, 92, 246, 0.15);
+  color: #7C3AED;
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .runtime-icon {

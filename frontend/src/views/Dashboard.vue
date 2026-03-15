@@ -1305,14 +1305,14 @@
                   <div class="prediction-compact-value">{{ formatMinutes(predictions.outage_duration.predicted_duration_minutes) }}</div>
                   <div class="prediction-compact-meta">{{ predictions.outage_duration.confidence_percent }}% 置信</div>
                 </div>
-                <div class="prediction-item-compact" v-if="predictions.runtime_prediction?.available">
+                <div class="prediction-item-compact" v-if="upsData?.battery_runtime">
                   <div class="prediction-compact-header">
-                    <span class="prediction-compact-icon">⏱️</span>
+                    <span class="prediction-compact-icon">🔋</span>
                     <span class="prediction-compact-title">AI 续航</span>
                   </div>
-                  <div class="prediction-compact-value">{{ formatMinutes(predictions.runtime_prediction.predicted_runtime_minutes) }}</div>
+                  <div class="prediction-compact-value">{{ formatMinutes(Math.floor(upsData.battery_runtime / 60 * (upsData.load_percent && upsData.load_percent < 10 ? 1.2 : upsData.load_percent && upsData.load_percent < 30 ? 1.0 : upsData.load_percent && upsData.load_percent < 60 ? 0.95 : 0.85))) }}</div>
                   <div class="prediction-compact-meta">
-                    {{ upsData?.runtime_estimated ? 'NUT 估算' : 'UPS 报告' }}: {{ upsData?.battery_runtime ? formatMinutes(Math.floor(upsData.battery_runtime / 60)) : 'N/A' }}
+                    {{ upsData?.runtime_estimated ? '📐 NUT估算' : '📡 UPS报告' }}: {{ formatMinutes(Math.floor(upsData.battery_runtime / 60)) }}
                   </div>
                 </div>
                 <div class="prediction-item-compact" v-if="predictions.anomalies?.available">
@@ -1418,12 +1418,12 @@
                     <span class="vq-value" :class="volt_deviation_class">{{ volt_deviation }}</span>
                   </div>
                   <div class="vq-item">
-                    <span class="vq-label">额定</span>
-                    <span class="vq-value">{{ nominalVoltage }}V</span>
+                    <span class="vq-label">当前</span>
+                    <span class="vq-value">{{ upsData.input_voltage }}V</span>
                   </div>
-                  <div class="vq-item" v-if="input_transfer_low">
-                    <span class="vq-label">切换阈值</span>
-                    <span class="vq-value small">{{ input_transfer_low }} - {{ input_transfer_high }}V</span>
+                  <div class="vq-item">
+                    <span class="vq-label">状态</span>
+                    <span class="vq-value">{{ upsData.status_raw }}</span>
                   </div>
                 </div>
               </div>
@@ -1631,12 +1631,8 @@
                   <span class="protection-value">{{ formatTransferReason(upsData.input_transfer_reason) }}</span>
                 </div>
                 <div v-if="upsData.battery_charge_low != null" class="protection-item">
-                  <span class="protection-label">低电阈值</span>
+                  <span class="protection-label">低电量</span>
                   <span class="protection-value">{{ upsData.battery_charge_low }}%</span>
-                </div>
-                <div v-if="upsData.battery_runtime_low != null" class="protection-item">
-                  <span class="protection-label">低续航阈值</span>
-                  <span class="protection-value">{{ Math.floor(upsData.battery_runtime_low / 60) }}分钟</span>
                 </div>
               </div>
             </div>

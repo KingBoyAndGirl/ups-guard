@@ -43,7 +43,6 @@
               <div class="form-group">
                 <label class="form-label">
                   停电后等待时间（分钟）
-                  <span class="help-icon" title="续航时间充足时，等待市电恢复的最长时间">ℹ️</span>
                 </label>
                 <input
                     v-model.number="config.shutdown_wait_minutes"
@@ -59,7 +58,6 @@
               <div class="form-group">
                 <label class="form-label">
                   最低电量百分比（%）
-                  <span class="help-icon" title="低于此值时发送低电量警告（不影响关机时机）">ℹ️</span>
                 </label>
                 <input
                     v-model.number="config.shutdown_battery_percent"
@@ -76,7 +74,6 @@
               <div class="form-group">
                 <label class="form-label">
                   预计续航阈值（分钟）
-                  <span class="help-icon" title="UPS 预计续航时间低于此值时立即触发关机（跳过等待时间）">ℹ️</span>
                 </label>
                 <input
                     v-model.number="config.estimated_runtime_threshold"
@@ -94,13 +91,11 @@
               <div class="form-group">
                 <label class="form-label">
                   最终等待时间（秒）
-                  <span class="help-icon" title="确认关机前的最后等待窗口">ℹ️</span>
                 </label>
                 <input
                     v-model.number="config.shutdown_final_wait_seconds"
                     type="number"
                     min="10"
-                    max="120"
                     class="form-control"
                     :class="{ 'error': errors.shutdown_final_wait_seconds }"
                 />
@@ -1454,7 +1449,7 @@ const validateConfig = (): boolean => {
     isValid = false
   }
 
-  if (config.value.shutdown_final_wait_seconds < 10 || config.value.shutdown_final_wait_seconds > 120) {
+  if (config.value.shutdown_final_wait_seconds < 10) {
     errors.value.shutdown_final_wait_seconds = '请输入 10-120 之间的值'
     isValid = false
   }

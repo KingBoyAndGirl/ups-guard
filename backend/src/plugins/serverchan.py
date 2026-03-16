@@ -14,6 +14,7 @@ class ServerChanPlugin(NotifierPlugin):
     plugin_id = "serverchan"
     plugin_name = "Server酱"
     plugin_description = "通过 Server酱 发送微信通知"
+    help_url = "https://sct.ftqq.com/"
     
     @classmethod
     def get_config_schema(cls) -> List[Dict[str, Any]]:

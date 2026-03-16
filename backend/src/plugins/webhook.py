@@ -16,6 +16,7 @@ class WebhookPlugin(NotifierPlugin):
     plugin_id = "webhook"
     plugin_name = "Webhook"
     plugin_description = "发送 HTTP 请求到自定义 Webhook URL"
+    help_url = ""
     
     @classmethod
     def get_config_schema(cls) -> List[Dict[str, Any]]:

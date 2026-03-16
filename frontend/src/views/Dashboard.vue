@@ -576,7 +576,10 @@
               </div>
               <div class="report-item">
                 <span class="label">输出电压</span>
-                <span class="value">{{ testReport.current_status.output_voltage }}V</span>
+                <span class="value">
+                  {{ testReport.current_status.output_voltage }}V
+                  <span v-if="testReport.current_status.output_voltage_estimated" class="voltage-source-badge estimated" title="根据输入电压和UPS状态推算">📊 推断</span>
+                </span>
               </div>
             </div>
           </div>
@@ -632,10 +635,26 @@
       </div>
     </div>
 
-    <!-- 初始加载状态（最高优先级，3秒内显示） -->
+    <!-- 初始加载状态（骨架屏，最高优先级，3秒内显示） -->
     <div v-if="isInitialLoading" class="loading-panel">
-      <div class="loading-spinner"></div>
-      <p>正在连接 UPS 服务...</p>
+      <div class="skeleton-container">
+        <div class="skeleton-col">
+          <div class="skeleton-card skeleton-card-status"></div>
+          <div class="skeleton-card skeleton-card-predictions"></div>
+          <div class="skeleton-card skeleton-card-short"></div>
+        </div>
+        <div class="skeleton-col">
+          <div class="skeleton-card skeleton-card-voltage"></div>
+          <div class="skeleton-card skeleton-card-battery"></div>
+          <div class="skeleton-card skeleton-card-device"></div>
+        </div>
+        <div class="skeleton-col">
+          <div class="skeleton-card skeleton-card-events"></div>
+          <div class="skeleton-card skeleton-card-short"></div>
+          <div class="skeleton-card skeleton-card-short"></div>
+        </div>
+      </div>
+      <p class="loading-text">正在连接 UPS 服务...</p>
     </div>
 
     <!-- 核心数据区域：三列布局 - 有数据时显示 -->
@@ -906,12 +925,12 @@
                   <span class="voltage-label">额定电压</span>
                   <span class="voltage-value-small">
                     {{ upsData.input_voltage_nominal || inferredNominalVoltage }} V
-                    <span v-if="!upsData.input_voltage_nominal && inferredNominalVoltage" class="voltage-inferred">(推断)</span>
+                    <span v-if="!upsData.input_voltage_nominal && inferredNominalVoltage" class="voltage-source-badge estimated" title="根据输入电压自动推断">📊 推断</span>
                   </span>
                 </div>
                 <div class="voltage-info-row" v-if="upsData.input_transfer_reason">
                   <span class="voltage-label">切换原因</span>
-                  <span class="voltage-value-small">{{ upsData.input_transfer_reason }}</span>
+                  <span class="voltage-value-small">{{ formatTransferReason(upsData.input_transfer_reason) }}</span>
                 </div>
                 <div class="voltage-info-row" v-if="upsData.input_sensitivity">
                   <span class="voltage-label">灵敏度</span>
@@ -974,7 +993,10 @@
                 </div>
                 <div class="metric-item-compact">
                   <span class="metric-label">输出电压</span>
-                  <span class="metric-value">{{ upsData.output_voltage ? `${upsData.output_voltage} V` : 'N/A' }}</span>
+                  <span class="metric-value">
+                    {{ upsData.output_voltage ? `${upsData.output_voltage} V` : 'N/A' }}
+                    <span v-if="upsData.output_voltage_estimated" class="voltage-source-badge estimated" title="根据输入电压和UPS状态推算">📊 推断</span>
+                  </span>
                 </div>
                 <div class="metric-item-compact">
                   <span class="metric-label">负载</span>
@@ -1039,10 +1061,6 @@
                   <span class="metric-value" :class="{ 'temp-warning': batteryTempHigh }">
                     {{ batteryTemp }}°C
                   </span>
-                </div>
-                <div class="metric-item-compact" v-if="upsData.battery_charge_low !== null && upsData.battery_charge_low !== undefined">
-                  <span class="metric-label">低电量阈值</span>
-                  <span class="metric-value">{{ upsData.battery_charge_low }}%</span>
                 </div>
               </div>
               <div class="battery-sparkline" v-if="metrics.length > 0">
@@ -1283,14 +1301,14 @@
                   <div class="prediction-compact-value">{{ formatMinutes(predictions.outage_duration.predicted_duration_minutes) }}</div>
                   <div class="prediction-compact-meta">{{ predictions.outage_duration.confidence_percent }}% 置信</div>
                 </div>
-                <div class="prediction-item-compact" v-if="predictions.runtime_prediction?.available">
+                <div class="prediction-item-compact" v-if="upsData?.battery_runtime">
                   <div class="prediction-compact-header">
-                    <span class="prediction-compact-icon">⏱️</span>
+                    <span class="prediction-compact-icon">🔋</span>
                     <span class="prediction-compact-title">AI 续航</span>
                   </div>
-                  <div class="prediction-compact-value">{{ formatMinutes(predictions.runtime_prediction.predicted_runtime_minutes) }}</div>
+                  <div class="prediction-compact-value">{{ formatMinutes(Math.floor(upsData.battery_runtime / 60 * (upsData.load_percent && upsData.load_percent < 10 ? 1.2 : upsData.load_percent && upsData.load_percent < 30 ? 1.0 : upsData.load_percent && upsData.load_percent < 60 ? 0.95 : 0.85))) }}</div>
                   <div class="prediction-compact-meta">
-                    {{ upsData?.runtime_estimated ? 'NUT 估算' : 'UPS 报告' }}: {{ upsData?.battery_runtime ? formatMinutes(Math.floor(upsData.battery_runtime / 60)) : 'N/A' }}
+                    {{ upsData?.runtime_estimated ? '📐 NUT估算' : '📡 UPS报告' }}: {{ formatMinutes(Math.floor(upsData.battery_runtime / 60)) }}
                   </div>
                 </div>
                 <div class="prediction-item-compact" v-if="predictions.anomalies?.available">
@@ -1308,6 +1326,66 @@
               <div v-if="!hasPredictions" class="prediction-placeholder-compact">
                 <span class="placeholder-icon-compact">📊</span>
                 <p class="placeholder-text-compact">需要更多历史数据提供预测</p>
+              </div>
+            </div>
+
+            <!-- 电池分析卡片 (内阻+续航预测) -->
+            <div
+              v-else-if="cardId === 'battery-analytics' && batteryAnalytics"
+              class="card battery-analytics-card draggable-card"
+              :class="{ 'is-dragging': dragState.draggedCardId === 'battery-analytics' }"
+              draggable="true"
+              @dragstart="(e) => handleDragStart(e, 'battery-analytics', colKey)"
+              @dragend="handleDragEnd"
+              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
+            >
+              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+              <h3 class="card-title-compact">🔋 电池分析</h3>
+              <div class="analytics-grid">
+                <div class="analytics-item">
+                  <span class="an-label">估算内阻</span>
+                  <span class="an-value" :class="resistance_class">{{ batteryAnalytics.estimated_resistance_mohm }} mΩ</span>
+                  <span class="an-trend">{{ resistance_trend_label }}</span>
+                </div>
+                <div class="analytics-item">
+                  <span class="an-label">AI 续航</span>
+                  <span class="an-value">{{ batteryAnalytics.predicted_runtime_minutes ? formatMinutes(batteryAnalytics.predicted_runtime_minutes) : 'N/A' }}</span>
+                  <span class="an-confidence">置信度: {{ batteryAnalytics.prediction_confidence }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 电压质量卡片 -->
+            <div
+              v-else-if="cardId === 'voltage-quality' && upsData.input_voltage"
+              class="card voltage-quality-card draggable-card"
+              :class="{ 'is-dragging': dragState.draggedCardId === 'voltage-quality' }"
+              draggable="true"
+              @dragstart="(e) => handleDragStart(e, 'voltage-quality', colKey)"
+              @dragend="handleDragEnd"
+              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
+            >
+              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+              <h3 class="card-title-compact">⚡ 电压质量</h3>
+              <div class="voltage-quality-content">
+                <div class="vq-score-circle" :class="'vq-grade-' + (upsData.voltage_quality_grade || 'F')">
+                  <div class="vq-score">{{ upsData.voltage_quality_score !== null ? upsData.voltage_quality_score : '?' }}</div>
+                  <div class="vq-grade">{{ upsData.voltage_quality_grade || 'N/A' }}</div>
+                </div>
+                <div class="vq-details">
+                  <div class="vq-item" v-if="volt_deviation">
+                    <span class="vq-label">偏差</span>
+                    <span class="vq-value" :class="volt_deviation_class">{{ volt_deviation }}</span>
+                  </div>
+                  <div class="vq-item">
+                    <span class="vq-label">当前</span>
+                    <span class="vq-value">{{ upsData.input_voltage }}V</span>
+                  </div>
+                  <div class="vq-item">
+                    <span class="vq-label">状态</span>
+                    <span class="vq-value">{{ upsData.status_raw }}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1495,12 +1573,6 @@
               <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
               <h3 class="card-title-compact">🛡️ 保护状态总览</h3>
               <div class="protection-grid">
-                <div v-if="upsData.ups_test_result" class="protection-item">
-                  <span class="protection-label">自检结果</span>
-                  <span class="protection-value" :class="testResultClass">
-                    {{ testResultIcon }} {{ upsData.ups_test_result }}
-                  </span>
-                </div>
                 <div v-if="upsData.input_sensitivity" class="protection-item">
                   <span class="protection-label">输入灵敏度</span>
                   <span class="protection-value protection-editable" @click="openSensitivityEdit" title="点击编辑">
@@ -1510,15 +1582,11 @@
                 </div>
                 <div v-if="upsData.input_transfer_reason" class="protection-item">
                   <span class="protection-label">切换原因</span>
-                  <span class="protection-value">{{ upsData.input_transfer_reason }}</span>
+                  <span class="protection-value">{{ formatTransferReason(upsData.input_transfer_reason) }}</span>
                 </div>
                 <div v-if="upsData.battery_charge_low != null" class="protection-item">
-                  <span class="protection-label">低电阈值</span>
+                  <span class="protection-label">低电量阈值</span>
                   <span class="protection-value">{{ upsData.battery_charge_low }}%</span>
-                </div>
-                <div v-if="upsData.battery_runtime_low != null" class="protection-item">
-                  <span class="protection-label">低续航阈值</span>
-                  <span class="protection-value">{{ Math.floor(upsData.battery_runtime_low / 60) }}分钟</span>
                 </div>
               </div>
             </div>
@@ -1549,6 +1617,102 @@
               </div>
               <div class="flags-raw">
                 原始状态：<code>{{ upsData.status_raw }}</code>
+              </div>
+            </div>
+
+            <!-- 切换统计卡片（apcupsd 数据） -->
+            <div
+              v-else-if="cardId === 'transfer-stats' && hasTransferData"
+              class="card transfer-stats-card draggable-card"
+              :class="{ 'is-dragging': dragState.draggedCardId === 'transfer-stats' }"
+              draggable="true"
+              @dragstart="(e) => handleDragStart(e, 'transfer-stats', colKey)"
+              @dragend="handleDragEnd"
+              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
+            >
+              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+              <h3 class="card-title-compact">🔄 切换统计</h3>
+              <div class="transfer-stats-grid">
+                <div class="transfer-stat-item" v-if="upsData.transfer_count != null">
+                  <span class="stat-icon">🔀</span>
+                  <div class="stat-details">
+                    <span class="stat-label">历史切换次数</span>
+                    <span class="stat-value">{{ upsData.transfer_count }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.time_on_battery != null">
+                  <span class="stat-icon">⏱️</span>
+                  <div class="stat-details">
+                    <span class="stat-label">本次电池时长</span>
+                    <span class="stat-value">{{ formatDuration(upsData.time_on_battery) }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.cumulative_on_battery != null">
+                  <span class="stat-icon">🔋</span>
+                  <div class="stat-details">
+                    <span class="stat-label">累计电池时长</span>
+                    <span class="stat-value">{{ formatDuration(upsData.cumulative_on_battery) }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.ups_alarm_del">
+                  <span class="stat-icon">🔔</span>
+                  <div class="stat-details">
+                    <span class="stat-label">蜂鸣器策略</span>
+                    <span class="stat-value">{{ formatAlarmDel(upsData.ups_alarm_del) }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.ups_starttime">
+                  <span class="stat-icon">🚀</span>
+                  <div class="stat-details">
+                    <span class="stat-label">守护进程启动</span>
+                    <span class="stat-value">{{ upsData.ups_starttime }}</span>
+                  </div>
+                </div>
+                <div class="transfer-stat-item" v-if="upsData.ups_backend">
+                  <span class="stat-icon">🔌</span>
+                  <div class="stat-details">
+                    <span class="stat-label">通信后端</span>
+                    <span class="stat-value backend-badge" :class="'backend-' + upsData.ups_backend">
+                      {{ upsData.ups_backend === 'apcupsd' ? 'apcupsd' : 'NUT' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 额定参数卡片 -->
+            <div
+              v-else-if="cardId === 'nominal-specs' && hasNominalSpecs"
+              class="card nominal-specs-card draggable-card"
+              :class="{ 'is-dragging': dragState.draggedCardId === 'nominal-specs' }"
+              draggable="true"
+              @dragstart="(e) => handleDragStart(e, 'nominal-specs', colKey)"
+              @dragend="handleDragEnd"
+              @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
+            >
+              <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
+              <h3 class="card-title-compact">📐 额定参数</h3>
+              <div class="nominal-specs-grid">
+                <div class="nominal-item" v-if="upsData.input_voltage_nominal">
+                  <span class="nominal-label">额定输入电压</span>
+                  <span class="nominal-value">{{ upsData.input_voltage_nominal }}V</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.battery_voltage_nominal">
+                  <span class="nominal-label">额定电池电压</span>
+                  <span class="nominal-value">{{ upsData.battery_voltage_nominal }}V</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.ups_realpower_nominal">
+                  <span class="nominal-label">额定有功功率</span>
+                  <span class="nominal-value">{{ upsData.ups_realpower_nominal }}W</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.ups_power_nominal">
+                  <span class="nominal-label">额定视在功率</span>
+                  <span class="nominal-value">{{ upsData.ups_power_nominal }}VA</span>
+                </div>
+                <div class="nominal-item" v-if="upsData.output_current_nominal">
+                  <span class="nominal-label">额定输出电流</span>
+                  <span class="nominal-value">{{ upsData.output_current_nominal }}A</span>
+                </div>
               </div>
             </div>
           </template>
@@ -1853,6 +2017,30 @@ const latestBatteryCharge = computed(() => {
 // AC/DC 电压判断阈值：低于此值认为是 DC UPS
 const AC_DC_VOLTAGE_THRESHOLD = 48
 
+// ========== 电池分析计算 ==========
+const batteryAnalyticsData = computed(() => batteryAnalytics.value?.data || {})
+
+const isShutdownPending = computed(() => {
+  return !!shutdownManager.value?.pending_shutdown_time
+})
+
+const resistance_trend_label = computed(() => {
+  const trend = batteryAnalytics.value?.resistance_trend
+  if (!trend) return 'N/A'
+  if (trend === 'stable') return '稳定'
+  if (trend === 'increasing') return '上升 (老化)'
+  if (trend === 'decreasing') return '下降'
+  return trend
+})
+
+const resistance_class = computed(() => {
+  const r = batteryAnalytics.value?.estimated_resistance_mohm
+  if (!r) return ''
+  if (r > 30) return 'text-danger'
+  if (r > 20) return 'text-warning'
+  return ''
+})
+
 // 推断额定电压（当 UPS 不报告 input.voltage.nominal 时）
 const inferredNominalVoltage = computed(() => {
   // UPS 已报告额定电压，不需要推断
@@ -1870,6 +2058,29 @@ const inferredNominalVoltage = computed(() => {
   }
   // AC UPS 默认 220V
   return 220
+})
+
+// ========== 电压质量计算 ==========
+const nominalVoltage = computed(() => {
+  return upsData.value?.input_voltage_nominal || inferredNominalVoltage.value || 220
+})
+
+const input_transfer_low = computed(() => upsData.value?.input_transfer_low)
+const input_transfer_high = computed(() => upsData.value?.input_transfer_high)
+
+const volt_deviation = computed(() => {
+  if (!upsData.value?.input_voltage || !nominalVoltage.value) return null
+  const deviation = Math.abs(upsData.value.input_voltage - nominalVoltage.value) / nominalVoltage.value * 100
+  return deviation.toFixed(1) + '%'
+})
+
+const volt_deviation_class = computed(() => {
+  if (!upsData.value?.input_voltage || !nominalVoltage.value) return ''
+  const deviation = Math.abs(upsData.value.input_voltage - nominalVoltage.value) / nominalVoltage.value * 100
+  if (deviation > 15) return 'text-danger'
+  if (deviation > 10) return 'text-warning'
+  if (deviation > 5) return 'text-muted'
+  return ''
 })
 
 // Phase 1 新增计算属性
@@ -1990,6 +2201,22 @@ const batteryChargerStatusClass = computed(() => {
   }
   return ''
 })
+
+// 切换原因中文映射
+const TRANSFER_REASON_MAP: Record<string, string> = {
+  'input voltage out of range': '输入电压超出范围',
+  'no transfer': '无切换',
+  'high line voltage': '输入电压过高',
+  'low line voltage': '输入电压过低',
+  'self test': '自测切换',
+  'forced': '强制切换',
+}
+
+// 格式化切换原因
+const formatTransferReason = (reason: string | null | undefined): string => {
+  if (!reason) return ''
+  return TRANSFER_REASON_MAP[reason.toLowerCase()] || reason
+}
 
 // 检测是否为占位符日期（2001/01/01 等）
 const isPlaceholderDate = (dateStr: string | null | undefined): boolean => {
@@ -2339,6 +2566,46 @@ const allStatusFlags = computed(() => {
   return [...ALL_STATUS_FLAGS]
 })
 
+// Transfer stats card (apcupsd data)
+const hasTransferData = computed(() => {
+  if (!upsData.value) return false
+  return !!(
+    upsData.value.transfer_count != null ||
+    upsData.value.time_on_battery != null ||
+    upsData.value.cumulative_on_battery != null ||
+    upsData.value.ups_alarm_del ||
+    upsData.value.ups_starttime ||
+    upsData.value.ups_backend
+  )
+})
+
+// Nominal specs card
+const hasNominalSpecs = computed(() => {
+  if (!upsData.value) return false
+  return !!(
+    upsData.value.input_voltage_nominal ||
+    upsData.value.battery_voltage_nominal ||
+    upsData.value.ups_realpower_nominal ||
+    upsData.value.ups_power_nominal ||
+    upsData.value.output_current_nominal ||
+    upsData.value.battery_charge_low != null ||
+    upsData.value.battery_runtime_low != null
+  )
+})
+
+// Format alarm delay
+const formatAlarmDel = (val: string | null | undefined): string => {
+  if (!val) return 'N/A'
+  const map: Record<string, string> = {
+    'No alarm': '无报警延迟',
+    '5sec': '5秒',
+    '30sec': '30秒',
+    '60sec': '60秒',
+    'always': '始终报警'
+  }
+  return map[val] || val
+}
+
 const recentEvents = ref<Event[]>([])
 const metrics = ref<Metric[]>([])
 const showShutdownConfirm = ref(false)
@@ -2352,6 +2619,18 @@ const lastDeviceRefresh = ref<Date | null>(null)
 const deviceRefreshInterval = ref<number | null>(null)
 const deviceRefreshIntervalSeconds = ref<number>(60) // 默认 60 秒
 
+// 电池分析数据
+const batteryAnalytics = ref<any>(null)
+
+// 自检提醒消息
+const selfTestReminderMessage = computed(() => {
+  const data = batteryAnalytics.value
+  if (!data?.needs_self_test) return ''
+  const days = data.days_since_last_test || '?'
+  const testType = data.recommended_test === 'deep' ? '深度' : '快速'
+  return `建议进行${testType}自检（距上次已${days}天）`
+})
+
 // 事件详情相关状态
 const showEventDetailDialog = ref(false)
 const currentEvent = ref<Event | null>(null)
@@ -2362,6 +2641,7 @@ const isInitialLoading = ref(true)
 // 定时器引用
 let metricsRefreshTimer: number | null = null
 let predictionsRefreshTimer: number | null = null
+let analyticsRefreshTimer: number | null = null
 let eventsRefreshTimer: number | null = null
 let lastMetricsRefresh = 0  // 上次 metrics 刷新时间戳
 
@@ -2421,6 +2701,31 @@ const fetchPredictions = async () => {
   } catch (error) {
     console.error('Failed to fetch predictions:', error)
     predictions.value = null
+  }
+}
+
+// ========== 电池分析 ==========
+const fetchAnalytics = async () => {
+  try {
+    const response = await axios.get('/api/analytics/battery')
+    batteryAnalytics.value = response.data
+  } catch (error) {
+    console.error('Failed to fetch analytics:', error)
+    batteryAnalytics.value = null
+  }
+}
+
+const cancelShutdown = async () => {
+  isCancelling.value = true
+  try {
+    await axios.post('/api/quick/cancel-shutdown')
+    toast.success('关机已取消')
+    await fetchMetrics()
+    await fetchShutdownStatus()
+  } catch (error: any) {
+    toast.error('取消失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    isCancelling.value = false
   }
 }
 
@@ -2580,22 +2885,6 @@ const confirmManualShutdown = async () => {
     toast.error('触发关机失败')
   } finally {
     isShuttingDown.value = false
-  }
-}
-
-// 取消关机
-const cancelShutdown = async () => {
-  if (isCancelling.value) return
-
-  isCancelling.value = true
-  try {
-    await axios.post('/api/actions/cancel-shutdown')
-    toast.success('关机已取消')
-  } catch (error) {
-    console.error('Failed to cancel shutdown:', error)
-    toast.error('取消关机失败')
-  } finally {
-    isCancelling.value = false
   }
 }
 
@@ -3720,6 +4009,7 @@ onMounted(async () => {
   fetchRecentEvents()
   fetchMetrics()
   fetchPredictions()  // 获取预测数据
+  fetchAnalytics()    // 获取电池分析数据
   loadConfigAndSetupRefresh()
   loadConfig()  // 加载配置数据（电池日期等）
   fetchDevicesStatus()
@@ -3738,6 +4028,9 @@ onMounted(async () => {
 
   // 定期刷新预测（每3分钟）
   predictionsRefreshTimer = window.setInterval(fetchPredictions, 3 * 60 * 1000)
+
+  // 定期刷新分析（每3分钟）
+  analyticsRefreshTimer = window.setInterval(fetchAnalytics, 3 * 60 * 1000)
 
   // 监听来自App.vue的设备状态变更事件
   const handleDeviceStateChange = () => {
@@ -3764,6 +4057,9 @@ onUnmounted(() => {
   }
   if (predictionsRefreshTimer !== null) {
     clearInterval(predictionsRefreshTimer)
+  }
+  if (analyticsRefreshTimer !== null) {
+    clearInterval(analyticsRefreshTimer)
   }
   if (eventsRefreshTimer !== null) {
     clearInterval(eventsRefreshTimer)
@@ -3844,26 +4140,76 @@ watch(latestHookProgress, (progress) => {
   justify-content: center;
   min-height: 300px;
   gap: 16px;
+  width: 100%;
+  padding: 2rem;
 }
 
-.loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 3px solid var(--border-color, #e5e7eb);
-  border-top-color: var(--color-primary, #3b82f6);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.loading-text {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-top: 1rem;
+}
+
+/* 骨架屏样式 */
+.skeleton-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ups-card-gap, 1rem);
+  width: 100%;
+  max-width: 1400px;
+  animation: skeleton-fade 1.5s ease-in-out infinite;
+}
+
+.skeleton-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ups-card-gap, 1rem);
+}
+
+.skeleton-card {
+  background: var(--bg-secondary);
+  border-radius: var(--ups-card-radius, 12px);
+  border: 1px solid var(--border-color);
+  opacity: 0.7;
+}
+
+.skeleton-card-status {
+  height: 150px;
+}
+
+.skeleton-card-predictions {
+  height: 120px;
+}
+
+.skeleton-card-voltage {
+  height: 170px;
+}
+
+.skeleton-card-battery {
+  height: 130px;
+}
+
+.skeleton-card-device {
+  height: 180px;
+}
+
+.skeleton-card-events {
+  height: 200px;
+}
+
+.skeleton-card-short {
+  height: 100px;
+}
+
+@keyframes skeleton-fade {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.3; }
 }
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
-}
-
-.loading-panel p {
-  color: var(--text-secondary);
-  font-size: 14px;
 }
 
 
@@ -4120,6 +4466,26 @@ watch(latestHookProgress, (progress) => {
   background: rgba(16, 185, 129, 0.15);
   color: #059669;
   border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* 电压来源标记（与续航来源标记风格一致） */
+.voltage-source-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  padding: 0.0625rem 0.3rem;
+  border-radius: 0.25rem;
+  margin-left: 0.25rem;
+  font-weight: 500;
+  cursor: help;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.voltage-source-badge.estimated {
+  background: rgba(139, 92, 246, 0.15);
+  color: #7C3AED;
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .runtime-icon {
@@ -5416,6 +5782,108 @@ watch(latestHookProgress, (progress) => {
   border-width: 0.1em;
 }
 
+/* 电压质量卡片 */
+.voltage-quality-card .voltage-quality-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.voltage-quality-card .vq-score-circle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 3px solid var(--border-color);
+}
+
+.voltage-quality-card .vq-score-circle.vq-grade-A { border-color: #22c55e; }
+.voltage-quality-card .vq-score-circle.vq-grade-B { border-color: #3b82f6; }
+.voltage-quality-card .vq-score-circle.vq-grade-C { border-color: #f59e0b; }
+.voltage-quality-card .vq-score-circle.vq-grade-D { border-color: #f97316; }
+.voltage-quality-card .vq-score-circle.vq-grade-F { border-color: #ef4444; }
+
+.voltage-quality-card .vq-score {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.voltage-quality-card .vq-grade {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.voltage-quality-card .vq-details {
+  flex: 1;
+}
+
+.voltage-quality-card .vq-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.voltage-quality-card .vq-label {
+  color: var(--text-secondary);
+}
+
+.voltage-quality-card .vq-value {
+  font-weight: 600;
+}
+
+.voltage-quality-card .vq-value.small {
+  font-size: 0.75rem;
+}
+
+.voltage-quality-card .text-danger { color: #ef4444; }
+.voltage-quality-card .text-warning { color: #f59e0b; }
+.voltage-quality-card .text-muted { color: var(--text-secondary); }
+
+/* 电池分析卡片 */
+.battery-analytics-card .analytics-grid {
+  display: flex;
+  gap: 1rem;
+}
+
+.battery-analytics-card .analytics-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.battery-analytics-card .an-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.battery-analytics-card .an-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.battery-analytics-card .an-trend {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.battery-analytics-card .an-confidence {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin-top: 0.25rem;
+}
+
 @keyframes spinner-border-animation {
   to {
     transform: rotate(360deg);
@@ -6013,6 +6481,105 @@ watch(latestHookProgress, (progress) => {
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
 }
 
+/* Transfer Stats Card */
+.transfer-stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.transfer-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-sm);
+}
+
+.transfer-stat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.stat-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.stat-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stat-details .stat-label {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.stat-details .stat-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backend-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+}
+
+.backend-apcupsd {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.backend-nut {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+
+/* Nominal Specs Card */
+.nominal-specs-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.nominal-specs-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.375rem;
+}
+
+.nominal-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.nominal-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.nominal-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
 /* Responsive Design for New Cards */
 @media (max-width: 768px) {
   .device-info-grid,
@@ -6030,6 +6597,10 @@ watch(latestHookProgress, (progress) => {
 
   .gauge-value {
     font-size: 1.25rem;
+  }
+
+  .transfer-stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -6557,5 +7128,13 @@ watch(latestHookProgress, (progress) => {
   font-family: 'Courier New', monospace;
   font-size: 0.875rem;
   color: var(--primary-color);
+}
+
+/* 估算值标识 */
+.estimated-badge {
+  font-size: 0.75rem;
+  cursor: help;
+  margin-left: 0.25rem;
+  vertical-align: middle;
 }
 </style>

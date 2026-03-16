@@ -65,6 +65,7 @@ class UpsData(BaseModel):
     battery_runtime: Optional[int] = None  # 剩余运行时间（秒）
     input_voltage: Optional[float] = None  # 输入电压
     output_voltage: Optional[float] = None  # 输出电压
+    output_voltage_estimated: bool = False  # 输出电压是否为估算值
     load_percent: Optional[float] = None  # 负载百分比
     temperature: Optional[float] = None  # 温度
     ups_model: Optional[str] = None  # UPS 型号
@@ -119,8 +120,18 @@ class UpsData(BaseModel):
     battery_charger_status: Optional[str] = None  # battery.charger.status: charging/discharging/floating/resting
     # 续航时间来源标记：True = 由 runtimecal 软件估算，False/None = UPS 硬件直报
     runtime_estimated: Optional[bool] = None
+    # 电压质量评估
+    voltage_quality_score: Optional[int] = None  # 电压质量评分 0-100
+    voltage_quality_grade: Optional[str] = None  # 电压质量等级 A/B/C/D/F
     # 连接状态
     nut_reconnect_count: Optional[int] = None  # NUT 连接重连次数（用于前端显示）
+    # apcupsd 特有参数
+    transfer_count: Optional[int] = None  # 历史切换次数 (NUMXFERS)
+    time_on_battery: Optional[int] = None  # 本次电池时长(秒) (TONBATT)
+    cumulative_on_battery: Optional[int] = None  # 累计电池时长(秒) (CUMONBATT)
+    ups_alarm_del: Optional[str] = None  # 蜂鸣器策略 (ALARMDEL)
+    ups_backend: Optional[str] = None  # 当前后端类型: nut/apcupsd
+    ups_starttime: Optional[str] = None  # UPS 守护进程启动时间
 
 
 class Event(BaseModel):
@@ -140,6 +151,7 @@ class Metric(BaseModel):
     battery_runtime: Optional[int] = None
     input_voltage: Optional[float] = None
     output_voltage: Optional[float] = None
+    output_voltage_estimated: bool = False  # 输出电压是否为估算值
     load_percent: Optional[float] = None
     temperature: Optional[float] = None
     # Phase 1 扩展采样字段

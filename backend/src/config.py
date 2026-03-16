@@ -27,12 +27,19 @@ ENV_FILE = BACKEND_ROOT / ".env"
 
 class Settings(BaseSettings):
     """环境变量配置"""
+    # UPS 后端类型：nut 或 apcupsd
+    ups_backend: str = "nut"
+
     # NUT 配置
     nut_host: str = "nut-server"
     nut_port: int = 3493
     nut_username: str = "monuser"
     nut_password: str = "monuser"
     nut_ups_name: str = ""  # 留空则自动发现
+
+    # apcupsd 配置
+    apcupsd_host: str = "127.0.0.1"
+    apcupsd_port: int = 3551
 
     # 数据库 (默认为项目根目录下的 data 文件夹)
     database_path: str = str(DATA_DIR / "ups_guard.db")

@@ -1450,7 +1450,7 @@ const validateConfig = (): boolean => {
   }
 
   if (config.value.shutdown_final_wait_seconds < 10) {
-    errors.value.shutdown_final_wait_seconds = '请输入 10-120 之间的值'
+    errors.value.shutdown_final_wait_seconds = '请输入大于 10 的值'
     isValid = false
   }
 

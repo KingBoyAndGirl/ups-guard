@@ -80,7 +80,9 @@ async def get_metrics(
                 "input_voltage": metric.input_voltage,
                 "output_voltage": metric.output_voltage,
                 "load_percent": metric.load_percent,
-                "temperature": metric.temperature
+                "temperature": metric.temperature,
+                "power_watts": metric.power_watts,
+                "energy_kwh": metric.energy_kwh
             }
             for metric in metrics
         ]

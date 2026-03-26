@@ -146,11 +146,35 @@ class HistoryService:
         
         async def _do_insert():
             """执行数据库插入"""
+            # 计算累计用电量: 上一条记录的 energy_kwh + 本次采样间隔的用电量
+            energy_kwh = metric.energy_kwh
+            if energy_kwh is None and metric.power_watts is not None:
+                try:
+                    # 获取上一条记录的时间戳和能耗
+                    row = await self.db.fetch_one(
+                        "SELECT timestamp, energy_kwh FROM metrics WHERE test_mode = ? ORDER BY timestamp DESC LIMIT 1",
+                        (test_mode,)
+                    )
+                    if row and row[1] is not None:
+                        # 计算时间间隔（小时）
+                        prev_time = datetime.fromisoformat(str(row[0]))
+                        now = datetime.now()
+                        dt_hours = (now - prev_time).total_seconds() / 3600
+                        if dt_hours > 0 and dt_hours < 24:  # 防止异常数据
+                            energy_kwh = row[1] + (metric.power_watts * dt_hours / 1000)
+                        else:
+                            energy_kwh = row[1]
+                    elif metric.power_watts is not None:
+                        # 首条记录
+                        energy_kwh = 0.0
+                except Exception:
+                    energy_kwh = 0.0
+
             await self.db.execute(
                 """
-                INSERT INTO metrics 
-                (battery_charge, battery_runtime, input_voltage, output_voltage, load_percent, temperature, test_mode)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO metrics
+                (battery_charge, battery_runtime, input_voltage, output_voltage, load_percent, temperature, test_mode, power_watts, energy_kwh)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     metric.battery_charge,
@@ -159,7 +183,9 @@ class HistoryService:
                     metric.output_voltage,
                     metric.load_percent,
                     metric.temperature,
-                    test_mode
+                    test_mode,
+                    metric.power_watts,
+                    energy_kwh
                 )
             )
         
@@ -206,15 +232,16 @@ class HistoryService:
         since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
         
         query = """
-            SELECT id, timestamp, battery_charge, battery_runtime, 
-                   input_voltage, output_voltage, load_percent, temperature
+            SELECT id, timestamp, battery_charge, battery_runtime,
+                   input_voltage, output_voltage, load_percent, temperature,
+                   power_watts, energy_kwh
             FROM metrics
             WHERE timestamp >= ? AND test_mode = ?
             ORDER BY timestamp ASC
         """
-        
+
         rows = await self.db.fetch_all(query, (since, test_mode))
-        
+
         metrics = []
         for row in rows:
             # Parse timestamp from database (UTC stored by SQLite CURRENT_TIMESTAMP)
@@ -223,7 +250,7 @@ class HistoryService:
             from datetime import timezone as tz
             if timestamp.tzinfo is None:
                 timestamp = timestamp.replace(tzinfo=tz.utc)
-            
+
             metric = Metric(
                 id=row['id'],
                 timestamp=timestamp,
@@ -232,7 +259,9 @@ class HistoryService:
                 input_voltage=row['input_voltage'],
                 output_voltage=row['output_voltage'],
                 load_percent=row['load_percent'],
-                temperature=row['temperature']
+                temperature=row['temperature'],
+                power_watts=row['power_watts'],
+                energy_kwh=row['energy_kwh']
             )
             metrics.append(metric)
         

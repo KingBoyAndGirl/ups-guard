@@ -161,6 +161,9 @@ class Metric(BaseModel):
     # Phase 2 扩展采样字段
     ambient_temperature: Optional[float] = None
     ambient_humidity: Optional[float] = None
+    # 功率与能耗字段
+    power_watts: Optional[float] = None  # 实时功率 (W)
+    energy_kwh: Optional[float] = None  # 累计用电量 (kWh, 度)
 
 
 class Config(BaseModel):

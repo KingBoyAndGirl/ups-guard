@@ -15,7 +15,8 @@ import {
   TitleComponent,
   TooltipComponent,
   LegendComponent,
-  GridComponent
+  GridComponent,
+  DataZoomComponent
 } from 'echarts/components'
 import type { Metric } from '@/types/ups'
 import { useTheme } from '@/composables/useTheme'
@@ -26,7 +27,8 @@ use([
   TitleComponent,
   TooltipComponent,
   LegendComponent,
-  GridComponent
+  GridComponent,
+  DataZoomComponent
 ])
 
 const props = defineProps<{
@@ -74,7 +76,7 @@ const chartOption = computed(() => {
       }
     },
     legend: {
-      data: ['电池电量', '负载百分比', '输入电压', '输出电压'],
+      data: ['电池电量', '负载百分比', '输入电压', '输出电压', '功率(W)', '用电量(kWh)'],
       textStyle: {
         color: textColor
       }
@@ -128,6 +130,7 @@ const chartOption = computed(() => {
         min: 0,
         max: 250,
         position: 'right',
+        offset: 0,
         axisLine: {
           lineStyle: {
             color: axisLineColor
@@ -144,6 +147,34 @@ const chartOption = computed(() => {
         nameTextStyle: {
           color: textColor
         }
+      },
+      {
+        type: 'value',
+        name: '功率 (W)',
+        min: 0,
+        position: 'right',
+        offset: 50,
+        axisLine: {
+          lineStyle: {
+            color: '#F472B6'
+          }
+        },
+        axisLabel: {
+          color: textColor
+        },
+        splitLine: {
+          show: false
+        },
+        nameTextStyle: {
+          color: textColor
+        }
+      }
+    ],
+    dataZoom: [
+      {
+        type: 'inside',
+        start: 0,
+        end: 100
       }
     ],
     series: [
@@ -182,6 +213,33 @@ const chartOption = computed(() => {
         smooth: true,
         lineStyle: { color: '#8B5CF6' },
         itemStyle: { color: '#8B5CF6' }
+      },
+      {
+        name: '功率(W)',
+        type: 'line',
+        yAxisIndex: 2,
+        data: props.metrics.map(m => m.power_watts !== undefined ? (m.power_watts != null ? Math.round(m.power_watts * 10) / 10 : null) : null),
+        smooth: true,
+        lineStyle: { color: '#F472B6', width: 2 },
+        itemStyle: { color: '#F472B6' },
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(244,114,182,0.15)' },
+              { offset: 1, color: 'rgba(244,114,182,0.02)' }
+            ]
+          }
+        }
+      },
+      {
+        name: '用电量(kWh)',
+        type: 'line',
+        yAxisIndex: 1,
+        data: props.metrics.map(m => m.energy_kwh != null ? Math.round(m.energy_kwh * 1000) / 1000 : null),
+        smooth: true,
+        lineStyle: { color: '#06B6D4', width: 2, type: 'dashed' },
+        itemStyle: { color: '#06B6D4' }
       }
     ]
   }

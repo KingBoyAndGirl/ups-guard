@@ -993,6 +993,16 @@ class UpsMonitor:
         try:
             history_service = await get_history_service()
             
+            # 计算实时功率 (W)
+            power_watts = None
+            if data.output_current and data.output_voltage:
+                power_watts = data.output_voltage * data.output_current
+            elif data.load_percent is not None:
+                if data.ups_realpower_nominal:
+                    power_watts = data.ups_realpower_nominal * data.load_percent / 100
+                elif data.ups_power_nominal:
+                    power_watts = data.ups_power_nominal * 0.6 * data.load_percent / 100
+
             metric = Metric(
                 battery_charge=data.battery_charge,
                 battery_runtime=data.battery_runtime,
@@ -1006,7 +1016,9 @@ class UpsMonitor:
                 ups_efficiency=data.ups_efficiency,
                 # Phase 2 扩展采样
                 ambient_temperature=data.ambient_temperature,
-                ambient_humidity=data.ambient_humidity
+                ambient_humidity=data.ambient_humidity,
+                # 功率
+                power_watts=power_watts
             )
             
             await history_service.add_metric(metric)

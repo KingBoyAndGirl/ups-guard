@@ -109,6 +109,9 @@ export interface Metric {
   // Phase 2 扩展字段
   ambient_temperature: number | null
   ambient_humidity: number | null
+  // 功率与能耗
+  power_watts: number | null  // 实时功率 (W)
+  energy_kwh: number | null   // 累计用电量 (kWh)
 }
 
 export interface Config {

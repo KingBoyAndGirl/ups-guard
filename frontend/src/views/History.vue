@@ -891,27 +891,35 @@ const exportData = async () => {
 
     const response = await axios.get(`/api/history/export?${params.toString()}`, {
       responseType: 'blob',
+      timeout: 60000, // 导出大数据量需要更长时间
       validateStatus: (status) => status < 500 // 允许 4xx 状态码不抛出异常
     })
 
     // 检查响应状态
     if (response.status >= 400) {
       // 尝试解析错误信息
-      const text = await response.data.text()
       try {
+        const text = await response.data.text()
         const errorData = JSON.parse(text)
-        throw new Error(errorData.detail || '导出失败')
-      } catch {
-        throw new Error('导出失败')
+        throw new Error(errorData.detail || `服务器错误 (${response.status})`)
+      } catch (parseErr) {
+        if (parseErr instanceof SyntaxError) {
+          throw new Error(`服务器响应格式错误 (${response.status})`)
+        }
+        throw parseErr
       }
     }
 
     // 检查响应是否为 JSON 错误（有些服务器返回 200 但内容是错误信息）
     const contentType = response.headers['content-type'] || ''
     if (contentType.includes('application/json')) {
-      const text = await response.data.text()
-      const errorData = JSON.parse(text)
-      throw new Error(errorData.detail || '导出失败')
+      try {
+        const text = await response.data.text()
+        const errorData = JSON.parse(text)
+        throw new Error(errorData.detail || '导出失败')
+      } catch {
+        throw new Error('服务器返回了意外的响应格式')
+      }
     }
 
     // 创建下载链接
@@ -949,14 +957,18 @@ const exportData = async () => {
     console.error('Export failed:', error)
     let errorMsg = '导出失败'
 
+    // 处理超时
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      errorMsg = '导出超时，请缩小日期范围后重试'
+    }
     // 处理 blob 响应中的错误
-    if (error.response?.data instanceof Blob) {
+    else if (error.response?.data instanceof Blob) {
       try {
         const text = await error.response.data.text()
         const errorData = JSON.parse(text)
-        errorMsg = errorData.detail || errorMsg
+        errorMsg = errorData.detail || `服务器错误 (${error.response.status})`
       } catch {
-        // 忽略解析错误
+        errorMsg = `导出失败 (HTTP ${error.response.status || '未知'})`
       }
     } else if (error.response?.data?.detail) {
       errorMsg = error.response.data.detail

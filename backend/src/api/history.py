@@ -178,8 +178,8 @@ async def export_csv(history_service, data_type: str, start_dt: datetime, end_dt
         writer = csv.writer(output)
         if data_type == "all":
             writer.writerow(['指标数据'])
-        writer.writerow(['时间', '电池电量(%)', '输入电压(V)', '输出电压(V)', '负载(%)', '温度(°C)', '运行时间(秒)'])
-        
+        writer.writerow(['时间', '电池电量(%)', '输入电压(V)', '输出电压(V)', '负载(%)', '温度(°C)', '运行时间(秒)', '功率(W)', '用电量(kWh)'])
+
         for metric in filtered_metrics:
             writer.writerow([
                 metric.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
@@ -188,7 +188,9 @@ async def export_csv(history_service, data_type: str, start_dt: datetime, end_dt
                 metric.output_voltage if metric.output_voltage is not None else '',
                 metric.load_percent if metric.load_percent is not None else '',
                 metric.temperature if metric.temperature is not None else '',
-                metric.battery_runtime if metric.battery_runtime is not None else ''
+                metric.battery_runtime if metric.battery_runtime is not None else '',
+                round(metric.power_watts, 1) if metric.power_watts is not None else '',
+                round(metric.energy_kwh, 3) if metric.energy_kwh is not None else ''
             ])
     
     # 创建响应
@@ -256,19 +258,19 @@ async def export_xlsx(history_service, data_type: str, start_dt: datetime, end_d
             ws_metrics.title = "指标数据"
         
         # 设置表头
-        headers = ['时间', '电池电量(%)', '输入电压(V)', '输出电压(V)', '负载(%)', '温度(°C)', '运行时间(秒)']
+        headers = ['时间', '电池电量(%)', '输入电压(V)', '输出电压(V)', '负载(%)', '温度(°C)', '运行时间(秒)', '功率(W)', '用电量(kWh)']
         ws_metrics.append(headers)
-        
+
         # 应用表头样式
         for cell in ws_metrics[1]:
             cell.font = header_font
             cell.fill = header_fill
-        
+
         # 获取并写入数据
         hours = int((end_dt - start_dt).total_seconds() / 3600) + 1
         metrics = await history_service.get_metrics(hours)
         filtered_metrics = [m for m in metrics if start_dt <= m.timestamp <= end_dt]
-        
+
         for metric in filtered_metrics:
             ws_metrics.append([
                 metric.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
@@ -277,7 +279,9 @@ async def export_xlsx(history_service, data_type: str, start_dt: datetime, end_d
                 metric.output_voltage,
                 metric.load_percent,
                 metric.temperature,
-                metric.battery_runtime
+                metric.battery_runtime,
+                round(metric.power_watts, 1) if metric.power_watts is not None else None,
+                round(metric.energy_kwh, 3) if metric.energy_kwh is not None else None
             ])
         
         # 自动调整列宽

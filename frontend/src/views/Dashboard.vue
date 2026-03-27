@@ -2378,14 +2378,38 @@ const energyStats = computed(() => {
   
   const powerW = computedPower.value || 0
   const efficiency = upsData.value?.ups_efficiency || 90
-  const actualPower = powerW / (efficiency / 100) // 实际消耗功率
-  
-  // 今日预估 (24小时)
-  const todayKwh = (actualPower * 24 / 1000).toFixed(2)
-  const todayCost = (parseFloat(todayKwh) * 0.6).toFixed(2) // 假设电费0.6元/kWh
-  
-  // 月度预估 (30天)
-  const monthlyKwh = (actualPower * 24 * 30 / 1000).toFixed(2)
+  const actualPower = powerW / (efficiency / 100) // 实际消耗功率（考虑UPS损耗）
+
+  // 今日用电：用功率×时间积分（和PowerChart一致）
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const now = new Date()
+  const midnightStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T00:00:00`
+  const todayMetrics = metrics.value.filter((m: any) => {
+    const ts = m.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+    return ts >= midnightStr
+  })
+
+  let todayWh = 0
+  for (let i = 1; i < todayMetrics.length; i++) {
+    const prevTs = todayMetrics[i - 1].timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+    const currTs = todayMetrics[i].timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+    const dt = (new Date(currTs.replace(' ', 'T')).getTime() - new Date(prevTs.replace(' ', 'T')).getTime()) / 3600000
+    if (dt <= 0 || dt > 24) continue
+    let watts = todayMetrics[i].power_watts
+    if (watts == null && todayMetrics[i].load_percent != null) {
+      watts = (upsData.value?.ups_realpower_nominal || 1024) * todayMetrics[i].load_percent / 100
+    }
+    if (watts != null) todayWh += watts * dt
+  }
+
+  // 今日实际用电（度）
+  const todayKwh = (todayWh / 1000).toFixed(2)
+  const todayCost = (parseFloat(todayKwh) * 0.6).toFixed(2)
+
+  // 月度预估：按已过去时间的平均功率推算30天
+  const hoursElapsed = (now.getTime() - new Date(midnightStr.replace('T', ' ')).getTime()) / 3600000
+  const avgPowerW = hoursElapsed > 0 ? todayWh / hoursElapsed : actualPower
+  const monthlyKwh = (avgPowerW * 24 * 30 / 1000).toFixed(2)
   const monthlyCost = (parseFloat(monthlyKwh) * 0.6).toFixed(2)
   
   // 效率提示

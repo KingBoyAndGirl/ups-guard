@@ -98,17 +98,25 @@ const dailyData = computed(() => {
     }
   }
 
-  // 统计所有天（边界日按实际数据时段计算）
+  // 填充所有天（从最早到最晚，缺失日补0）
+  const dates = Array.from(dailyWh.keys()).sort()
+  if (dates.length === 0) return []
+
   const result: { date: string; dateShort: string; kwh: number }[] = []
-  for (const [date, wh] of dailyWh) {
-    const d = new Date(date)
+  const firstDate = new Date(dates[0])
+  const lastDate = new Date(dates[dates.length - 1])
+  const current = new Date(firstDate)
+
+  while (current <= lastDate) {
+    const dateKey = formatDateFull(current)
+    const wh = dailyWh.get(dateKey) || 0
     result.push({
-      date,
-      dateShort: formatDate(d),
+      date: dateKey,
+      dateShort: formatDate(current),
       kwh: Math.round(wh) / 1000
     })
+    current.setDate(current.getDate() + 1)
   }
-  result.sort((a, b) => a.date.localeCompare(b.date))
   return result
 })
 

@@ -2686,7 +2686,11 @@ const loadConfig = async () => {
 
 const fetchMetrics = async () => {
   try {
-    const response = await axios.get('/api/history/metrics?hours=1')
+    // 今天从凌晨00:00到现在的小时数
+    const now = new Date()
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const hoursToday = Math.max(1, Math.ceil((now.getTime() - midnight.getTime()) / 3600000))
+    const response = await axios.get(`/api/history/metrics?hours=${hoursToday}`)
     metrics.value = response.data.metrics
     lastMetricsRefresh = Date.now()
   } catch (error) {

@@ -147,6 +147,27 @@ const chartOption = computed(() => {
       borderColor: isDark ? '#374151' : '#E5E7EB',
       textStyle: {
         color: textColor
+      },
+      formatter: (params: any) => {
+        if (!params || !params.length) return ''
+        const idx = params[0].dataIndex
+        const m = props.metrics[idx]
+        const nominal = props.upsNominalPower || 1000
+        let html = `<b>${params[0].axisValueLabel}</b><br/>`
+        for (const p of params) {
+          if (p.seriesName === '功率(W)') {
+            let watts = m.power_watts
+            if (watts == null && m.load_percent != null) {
+              watts = nominal * m.load_percent / 100
+            }
+            html += `${p.marker} 功率: <b>${watts != null ? (Math.round(watts * 10) / 10) + 'W' : 'N/A'}</b><br/>`
+          } else if (p.seriesName === '用电量(kWh)') {
+            html += `${p.marker} 今日用电: <b>${p.value != null ? p.value + ' 度' : 'N/A'}</b><br/>`
+          } else {
+            html += `${p.marker} ${p.seriesName}: <b>${p.value != null ? p.value : 'N/A'}</b><br/>`
+          }
+        }
+        return html
       }
     },
     legend: {
@@ -304,19 +325,6 @@ const chartOption = computed(() => {
               { offset: 0, color: 'rgba(244,114,182,0.15)' },
               { offset: 1, color: 'rgba(244,114,182,0.02)' }
             ]
-          }
-        },
-        tooltip: {
-          // 实际功率值显示在 tooltip
-          formatter: (params: any) => {
-            const idx = params.dataIndex
-            const m = props.metrics[idx]
-            const nominal = props.upsNominalPower || 1000
-            let watts = m.power_watts
-            if (watts == null && m.load_percent != null) {
-              watts = nominal * m.load_percent / 100
-            }
-            return watts != null ? `${params.marker} 功率: <b>${Math.round(watts * 10) / 10}W</b>` : ''
           }
         }
       },

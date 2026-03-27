@@ -3,6 +3,7 @@
     <div class="card-header">
       <h3 class="card-title">{{ title }}</h3>
       <span v-if="todayEnergy !== null" class="today-energy">今日用电: {{ todayEnergy }} 度</span>
+      <span v-else-if="props.metrics.length" class="today-energy today-energy-warn">今日用电: 数据不足</span>
     </div>
     <v-chart class="chart" :option="chartOption" autoresize />
   </div>
@@ -42,24 +43,44 @@ const props = defineProps<{
 
 const { effectiveTheme } = useTheme()
 
-// 今日用电量（度）
+// 今日用电量（度）：用功率 × 时间积分计算
 const todayEnergy = computed(() => {
-  if (!props.metrics.length) return null
+  if (!props.metrics.length || !props.upsNominalPower) return null
   const pad = (n: number) => String(n).padStart(2, '0')
   const now = new Date()
   const midnightStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T00:00:00`
-  const todayStart = props.metrics.find(m => {
+
+  // 只用今天 00:00 之后的数据
+  const todayMetrics = props.metrics.filter(m => {
     const ts = m.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
-    return ts >= midnightStr && m.energy_kwh != null
+    return ts >= midnightStr
   })
-  const beforeStart = [...props.metrics].reverse().find(m => {
-    const ts = m.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
-    return ts < midnightStr && m.energy_kwh != null
-  })
-  const baseline = todayStart?.energy_kwh ?? beforeStart?.energy_kwh ?? 0
-  const latest = [...props.metrics].reverse().find(m => m.energy_kwh != null)
-  if (!latest) return null
-  return (latest.energy_kwh - baseline).toFixed(2)
+
+  if (todayMetrics.length < 2) return '0.00'
+
+  let totalWh = 0
+  for (let i = 1; i < todayMetrics.length; i++) {
+    const prev = todayMetrics[i - 1]
+    const curr = todayMetrics[i]
+    // 解析时间差
+    const prevTs = prev.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+    const currTs = curr.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+    const prevTime = new Date(prevTs.replace('T', ' '))
+    const currTime = new Date(currTs.replace('T', ' '))
+    const dtHours = (currTime.getTime() - prevTime.getTime()) / 3600000
+    if (dtHours <= 0 || dtHours > 24) continue
+
+    // 功率：优先 power_watts，否则用 load × 标称
+    let watts = curr.power_watts
+    if (watts == null && curr.load_percent != null) {
+      watts = props.upsNominalPower * curr.load_percent / 100
+    }
+    if (watts != null) {
+      totalWh += watts * dtHours
+    }
+  }
+
+  return (totalWh / 1000).toFixed(2)  // Wh → kWh（度）
 })
 
 const chartOption = computed(() => {

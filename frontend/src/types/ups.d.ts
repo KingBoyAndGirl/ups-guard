@@ -12,12 +12,16 @@ export interface UpsData {
   battery_runtime: number | null
   input_voltage: number | null
   output_voltage: number | null
+  output_voltage_estimated: boolean
   load_percent: number | null
   temperature: number | null
   ups_model: string | null
   ups_manufacturer: string | null
   last_update: string
   shutdown: ShutdownStatus
+  // 电压质量
+  voltage_quality_score: number | null
+  voltage_quality_grade: string | null
   // 新增字段
   ups_power_nominal: number | null
   ups_realpower: number | null
@@ -65,6 +69,13 @@ export interface UpsData {
   battery_charger_status: string | null
   // 续航时间来源标记：true = runtimecal 软件估算，false/null = UPS 硬件直报
   runtime_estimated: boolean | null
+  // apcupsd 特有参数
+  transfer_count: number | null  // 历史切换次数
+  time_on_battery: number | null  // 本次电池时长(秒)
+  cumulative_on_battery: number | null  // 累计电池时长(秒)
+  ups_alarm_del: string | null  // 蜂鸣器策略
+  ups_backend: string | null  // 当前后端类型: nut/apcupsd
+  ups_starttime: string | null  // UPS 守护进程启动时间
 }
 
 export interface ShutdownStatus {
@@ -98,6 +109,9 @@ export interface Metric {
   // Phase 2 扩展字段
   ambient_temperature: number | null
   ambient_humidity: number | null
+  // 功率与能耗
+  power_watts: number | null  // 实时功率 (W)
+  energy_kwh: number | null   // 累计用电量 (kWh)
 }
 
 export interface Config {
@@ -132,6 +146,7 @@ export interface NotifyPlugin {
   id: string
   name: string
   description: string
+  help_url?: string
   config_schema: ConfigField[]
 }
 

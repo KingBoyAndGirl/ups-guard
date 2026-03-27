@@ -1,6 +1,6 @@
 """API 路由器"""
 from fastapi import APIRouter
-from api import status, history, config, websocket, ups, actions, system, hooks, devices, predictions, preferences, health, ups_control, agents
+from api import status, history, config, websocket, ups, actions, system, hooks, devices, predictions, preferences, health, ups_control, agents, diagnostic, quick_actions, analytics
 
 # 创建主路由器
 router = APIRouter(prefix="/api")
@@ -20,3 +20,6 @@ router.include_router(predictions.router, tags=["predictions"])
 router.include_router(preferences.router, tags=["preferences"])
 router.include_router(health.router, tags=["health"])
 router.include_router(agents.router, tags=["agents"])
+router.include_router(diagnostic.router, tags=["diagnostic"])
+router.include_router(quick_actions.router, tags=["quick-actions"])
+router.include_router(analytics.router, tags=["analytics"])

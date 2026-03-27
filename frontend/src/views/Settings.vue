@@ -43,13 +43,11 @@
               <div class="form-group">
                 <label class="form-label">
                   停电后等待时间（分钟）
-                  <span class="help-icon" title="续航时间充足时，等待市电恢复的最长时间">ℹ️</span>
                 </label>
                 <input
                     v-model.number="config.shutdown_wait_minutes"
                     type="number"
                     min="1"
-                    max="60"
                     class="form-control"
                     :class="{ 'error': errors.shutdown_wait_minutes }"
                 />
@@ -60,7 +58,6 @@
               <div class="form-group">
                 <label class="form-label">
                   最低电量百分比（%）
-                  <span class="help-icon" title="低于此值时发送低电量警告（不影响关机时机）">ℹ️</span>
                 </label>
                 <input
                     v-model.number="config.shutdown_battery_percent"
@@ -77,13 +74,11 @@
               <div class="form-group">
                 <label class="form-label">
                   预计续航阈值（分钟）
-                  <span class="help-icon" title="UPS 预计续航时间低于此值时立即触发关机（跳过等待时间）">ℹ️</span>
                 </label>
                 <input
                     v-model.number="config.estimated_runtime_threshold"
                     type="number"
                     min="1"
-                    max="30"
                     class="form-control"
                     :class="{ 'error': errors.estimated_runtime_threshold }"
                 />
@@ -96,13 +91,11 @@
               <div class="form-group">
                 <label class="form-label">
                   最终等待时间（秒）
-                  <span class="help-icon" title="确认关机前的最后等待窗口">ℹ️</span>
                 </label>
                 <input
                     v-model.number="config.shutdown_final_wait_seconds"
                     type="number"
                     min="10"
-                    max="120"
                     class="form-control"
                     :class="{ 'error': errors.shutdown_final_wait_seconds }"
                 />
@@ -264,6 +257,11 @@
                     <option v-for="plugin in availablePlugins" :key="plugin.id" :value="plugin.id">{{ plugin.name }}</option>
                   </select>
                   <button class="btn btn-secondary" @click="addChannel" :disabled="!selectedPlugin">添加</button>
+                </div>
+                <div v-if="selectedPluginHelpUrl" class="plugin-help-link">
+                  <a :href="selectedPluginHelpUrl" target="_blank" rel="noopener noreferrer">
+                    📖 如何获取 {{ selectedPluginName }} 的配置参数？
+                  </a>
                 </div>
               </div>
 
@@ -1310,6 +1308,20 @@ const monitoringStats = ref<MonitoringStats | null>(null)
 const availablePlugins = ref<NotifyPlugin[]>([])
 const selectedPlugin = ref('')
 const showChannelEditor = ref(false)
+
+// 选中插件的帮助链接
+const selectedPluginHelpUrl = computed(() => {
+  if (!selectedPlugin.value) return ''
+  const plugin = availablePlugins.value.find(p => p.id === selectedPlugin.value)
+  return plugin?.help_url || ''
+})
+
+// 选中插件的名称
+const selectedPluginName = computed(() => {
+  if (!selectedPlugin.value) return ''
+  const plugin = availablePlugins.value.find(p => p.id === selectedPlugin.value)
+  return plugin?.name || ''
+})
 const editingChannel = ref<NotifyChannel | null>(null)
 const editingChannelIndex = ref(-1)
 const testingChannelIndex = ref(-1)
@@ -1422,8 +1434,8 @@ const validateConfig = (): boolean => {
   errors.value = {}
   let isValid = true
 
-  if (config.value.shutdown_wait_minutes < 1 || config.value.shutdown_wait_minutes > 60) {
-    errors.value.shutdown_wait_minutes = '请输入 1-60 之间的值'
+  if (config.value.shutdown_wait_minutes < 1) {
+    errors.value.shutdown_wait_minutes = '请输入大于 0 的值'
     isValid = false
   }
 
@@ -1432,13 +1444,13 @@ const validateConfig = (): boolean => {
     isValid = false
   }
 
-  if (config.value.estimated_runtime_threshold < 1 || config.value.estimated_runtime_threshold > 30) {
-    errors.value.estimated_runtime_threshold = '请输入 1-30 之间的值'
+  if (config.value.estimated_runtime_threshold < 1) {
+    errors.value.estimated_runtime_threshold = '请输入大于 0 的值'
     isValid = false
   }
 
-  if (config.value.shutdown_final_wait_seconds < 10 || config.value.shutdown_final_wait_seconds > 120) {
-    errors.value.shutdown_final_wait_seconds = '请输入 10-120 之间的值'
+  if (config.value.shutdown_final_wait_seconds < 10) {
+    errors.value.shutdown_final_wait_seconds = '请输入大于 10 的值'
     isValid = false
   }
 
@@ -1974,10 +1986,26 @@ const copyApiToken = async () => {
 }
 
 const saveApiToken = async () => {
+  const tokenToSave = newApiToken.value.trim()
+  
+  // 验证 Token 格式
+  if (!tokenToSave) {
+    toast.error('请先输入或生成 Token')
+    return
+  }
+  if (tokenToSave.length < 8) {
+    toast.error('Token 长度不能少于 8 个字符')
+    return
+  }
+  if (tokenToSave.length > 128) {
+    toast.error('Token 长度不能超过 128 个字符')
+    return
+  }
+
   savingApiToken.value = true
   try {
     const resp = await axios.put('/api/system/api-token', {
-      token: newApiToken.value.trim()
+      token: tokenToSave
     })
 
     const updatedToken = resp.data.token
@@ -1996,7 +2024,13 @@ const saveApiToken = async () => {
 
     toast.success('Token 已更新，请在 Agent 客户端中同步修改')
   } catch (error: any) {
-    toast.error('修改 Token 失败：' + (error.response?.data?.detail || error.message))
+    const detail = error.response?.data?.detail || error.message
+    // 如果是认证失败，提示可能的原因
+    if (error.response?.status === 401) {
+      toast.error('Token 更新失败：当前会话认证已失效，请刷新页面重试')
+    } else {
+      toast.error('修改 Token 失败：' + detail)
+    }
   } finally {
     savingApiToken.value = false
   }
@@ -3373,6 +3407,20 @@ watch(
 .add-channel-row {
   display: flex;
   gap: 0.5rem;
+}
+
+.plugin-help-link {
+  margin-top: 0.5rem;
+}
+
+.plugin-help-link a {
+  font-size: 0.8125rem;
+  color: var(--color-primary, #3b82f6);
+  text-decoration: none;
+}
+
+.plugin-help-link a:hover {
+  text-decoration: underline;
 }
 
 

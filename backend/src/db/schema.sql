@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS metrics (
     output_voltage REAL,
     load_percent REAL,
     temperature REAL,
-    test_mode TEXT DEFAULT 'production'  -- 测试模式: production, mock, dry_run
+    test_mode TEXT DEFAULT 'production',  -- 测试模式: production, mock, dry_run
+    power_watts REAL,  -- 实时功率 (W)
+    energy_kwh REAL  -- 累计用电量 (kWh, 度)
 );
 
 -- 电池测试报告表

@@ -7,13 +7,23 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
+# 全局中间件实例引用（供热更新 Token 使用）
+_middleware_instance = None
+
+
+def get_auth_middleware():
+    """获取全局认证中间件实例"""
+    return _middleware_instance
+
 
 class AuthMiddleware:
     """Bearer Token Authentication Middleware（支持 Token 热更新）"""
 
     def __init__(self, app, api_token: str):
+        global _middleware_instance
         self.app = app
         self._api_token = api_token
+        _middleware_instance = self  # 注册全局引用
         # SKIP_AUTH 独立控制，与 MOCK_MODE 解耦
         # MOCK_MODE 只模拟 UPS 数据，不影响认证安全
         self.skip_auth = os.environ.get("SKIP_AUTH", "").lower() in ("true", "1", "yes")

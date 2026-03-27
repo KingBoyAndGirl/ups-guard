@@ -325,6 +325,10 @@ def _determine_test_result(
             return 'warning'
         elif 'error' in result_lower or 'failed' in result_lower:
             return 'failed'
+        elif 'no test' in result_lower:
+            # APC UPS 在市电正常时不会执行电池测试
+            # 命令已接受但测试未真正开始（需要 UPS 切换到电池模式）
+            return 'no_test_initiated'
         return 'unknown'
 
     # 策略 2：UPS 不提供 ups.test.result（如 nutdrv_qx + Voltronic-QS）
@@ -418,7 +422,24 @@ async def test_battery(test_type: str, background_tasks: BackgroundTasks):
     # 启动后台任务监控测试状态
     background_tasks.add_task(monitor_test_completion, report_service, monitor, test_type)
 
-    return await execute_ups_command(CommandRequest(command=command_map[test_type]))
+    # 执行测试命令
+    result = await execute_ups_command(CommandRequest(command=command_map[test_type]))
+
+    # 检查 UPS 是否在市电供电模式（APC UPS 市电模式下不会真正执行测试）
+    try:
+        current_vars = await monitor.nut_client.list_vars()
+        ups_status = current_vars.get('ups.status', '') if current_vars else ''
+        if 'OL' in ups_status and 'OB' not in ups_status:
+            # 市电供电中，测试可能不会真正开始
+            return CommandResponse(
+                success=True,
+                message=f"命令已发送，但 APC UPS 在市电正常时不会执行电池测试。测试将在下次断电时自动开始，或请手动断开市电触发测试。",
+                command=command_map[test_type]
+            )
+    except Exception:
+        pass
+
+    return result
 
 
 @router.get("/ups/test-report")

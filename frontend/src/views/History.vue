@@ -21,11 +21,16 @@
         <div v-if="loadingMetrics" class="loading-state">
           <span>加载中...</span>
         </div>
-        <PowerChart
-          v-else-if="metrics.length > 0"
-          title=""
-          :metrics="metrics"
-        />
+        <template v-else-if="metrics.length > 0">
+          <PowerChart
+            title=""
+            :metrics="metrics"
+          />
+          <DailyEnergyChart
+            :metrics="metrics"
+            :upsNominalPower="undefined"
+          />
+        </template>
         <p v-else class="empty-state">暂无历史数据</p>
       </div>
 
@@ -433,6 +438,7 @@ import axios from 'axios'
 // 使用异步组件加载 ECharts，提升首屏加载速度
 const PowerChart = defineAsyncComponent(() => import('@/components/PowerChart.vue'))
 import DateRangePicker from '@/components/DateRangePicker.vue'
+import DailyEnergyChart from '@/components/DailyEnergyChart.vue'
 import type { Metric } from '@/types/ups'
 import { useToast } from '@/composables/useToast'
 
@@ -785,13 +791,17 @@ const queryDataSilent = async () => {
     const response = await axios.get(`/api/history/metrics?${queryParam}`)
 
     // Filter results to only include data within the selected date range
+    // 前端发的是本地时间字符串，后端返回UTC时间戳，统一按UTC比较
     const startTime = start.getTime()
     const endTime = end.getTime()
-    
+
     metrics.value = response.data.metrics.filter((m: Metric) => {
-      // Parse the ISO timestamp from backend (which may be in UTC or server local time)
-      const timestamp = new Date(m.timestamp).getTime()
-      return timestamp >= startTime && timestamp <= endTime
+      // 后端时间戳是无时区格式 "2026-03-27 08:00:00"，按本地时间解析
+      const ts = m.timestamp.replace('T', ' ').replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+      const parts = ts.split(/[-T:. ]/)
+      const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]),
+        parseInt(parts[3] || '0'), parseInt(parts[4] || '0'), parseInt(parts[5] || '0'))
+      return date.getTime() >= startTime && date.getTime() <= endTime
     })
   } catch (error) {
     console.error('Failed to query metrics:', error)
@@ -891,27 +901,35 @@ const exportData = async () => {
 
     const response = await axios.get(`/api/history/export?${params.toString()}`, {
       responseType: 'blob',
+      timeout: 60000, // 导出大数据量需要更长时间
       validateStatus: (status) => status < 500 // 允许 4xx 状态码不抛出异常
     })
 
     // 检查响应状态
     if (response.status >= 400) {
       // 尝试解析错误信息
-      const text = await response.data.text()
       try {
+        const text = await response.data.text()
         const errorData = JSON.parse(text)
-        throw new Error(errorData.detail || '导出失败')
-      } catch {
-        throw new Error('导出失败')
+        throw new Error(errorData.detail || `服务器错误 (${response.status})`)
+      } catch (parseErr) {
+        if (parseErr instanceof SyntaxError) {
+          throw new Error(`服务器响应格式错误 (${response.status})`)
+        }
+        throw parseErr
       }
     }
 
     // 检查响应是否为 JSON 错误（有些服务器返回 200 但内容是错误信息）
     const contentType = response.headers['content-type'] || ''
     if (contentType.includes('application/json')) {
-      const text = await response.data.text()
-      const errorData = JSON.parse(text)
-      throw new Error(errorData.detail || '导出失败')
+      try {
+        const text = await response.data.text()
+        const errorData = JSON.parse(text)
+        throw new Error(errorData.detail || '导出失败')
+      } catch {
+        throw new Error('服务器返回了意外的响应格式')
+      }
     }
 
     // 创建下载链接
@@ -949,14 +967,18 @@ const exportData = async () => {
     console.error('Export failed:', error)
     let errorMsg = '导出失败'
 
+    // 处理超时
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      errorMsg = '导出超时，请缩小日期范围后重试'
+    }
     // 处理 blob 响应中的错误
-    if (error.response?.data instanceof Blob) {
+    else if (error.response?.data instanceof Blob) {
       try {
         const text = await error.response.data.text()
         const errorData = JSON.parse(text)
-        errorMsg = errorData.detail || errorMsg
+        errorMsg = errorData.detail || `服务器错误 (${error.response.status})`
       } catch {
-        // 忽略解析错误
+        errorMsg = `导出失败 (HTTP ${error.response.status || '未知'})`
       }
     } else if (error.response?.data?.detail) {
       errorMsg = error.response.data.detail

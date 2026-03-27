@@ -19,6 +19,7 @@ class DingTalkPlugin(NotifierPlugin):
     plugin_id = "dingtalk"
     plugin_name = "钉钉机器人"
     plugin_description = "通过钉钉群机器人发送 Markdown 通知"
+    help_url = "https://open.dingtalk.com/document/robots/custom-robot-access"
     
     @classmethod
     def get_config_schema(cls) -> List[Dict[str, Any]]:

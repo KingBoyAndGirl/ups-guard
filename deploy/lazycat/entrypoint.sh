@@ -15,11 +15,18 @@ export DATABASE_PATH="${DATABASE_PATH:-${DATA_DIR}/ups_guard.db}"
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export MOCK_MODE="${MOCK_MODE:-false}"
 
+# UPS 后端类型：nut 或 apcupsd
+export UPS_BACKEND="${UPS_BACKEND:-nut}"
+
 # NUT 配置
 export NUT_HOST="${NUT_HOST:-127.0.0.1}"
 export NUT_PORT="${NUT_PORT:-3493}"
 export NUT_USERNAME="${NUT_USERNAME:-monuser}"
 export NUT_PASSWORD="${NUT_PASSWORD:-secret}"
+
+# apcupsd 配置
+export APCUPSD_HOST="${APCUPSD_HOST:-127.0.0.1}"
+export APCUPSD_PORT="${APCUPSD_PORT:-3551}"
 
 # UPS 配置
 export UPS_DRIVER="${UPS_DRIVER:-usbhid-ups}"
@@ -50,22 +57,51 @@ else
     echo "  Warning: NUT user not found, skipping directory ownership changes"
 fi
 
-# 启动 NUT 服务（后台运行）
-echo ""
-echo "Starting NUT service..."
-if [ -f "/app/nut/entrypoint.sh" ]; then
-    cd /app/nut
-    bash /app/nut/entrypoint.sh &
-    NUT_PID=$!
-    echo "  NUT service started (PID: ${NUT_PID})"
-    # 等待 NUT 服务启动
-    sleep 5
-    # 验证进程是否仍在运行
-    if ! kill -0 ${NUT_PID} 2>/dev/null; then
-        echo "  Warning: NUT service process exited unexpectedly"
+# 根据 UPS_BACKEND 启动对应服务
+if [ "${UPS_BACKEND}" = "apcupsd" ]; then
+    echo ""
+    echo "Starting apcupsd service (UPS_BACKEND=apcupsd)..."
+    if command -v apcupsd &>/dev/null; then
+        # 确保 USB 设备权限
+        chmod -R 777 /dev/bus/usb 2>/dev/null || true
+        # 配置 apcupsd
+        mkdir -p /etc/apcupsd /var/lock
+        printf "## apcupsd.conf v1.1 ##\nUPSCABLE usb\nUPSTYPE usb\nDEVICE\nNETSERVER on\nNISIP 0.0.0.0\nNISPORT ${APCUPSD_PORT}\n" > /etc/apcupsd/apcupsd.conf
+        # 启动 apcupsd
+        apcupsd -b -d1 &
+        APCUPSD_PID=$!
+        echo "  apcupsd started (PID: ${APCUPSD_PID})"
+        sleep 3
+        if ! kill -0 ${APCUPSD_PID} 2>/dev/null; then
+            echo "  Warning: apcupsd process exited unexpectedly"
+        fi
+    else
+        echo "  Installing apcupsd..."
+        apt-get update -qq && apt-get install -y -qq apcupsd usbutils 2>/dev/null
+        chmod -R 777 /dev/bus/usb 2>/dev/null || true
+        mkdir -p /etc/apcupsd /var/lock
+        printf "## apcupsd.conf v1.1 ##\nUPSCABLE usb\nUPSTYPE usb\nDEVICE\nNETSERVER on\nNISIP 0.0.0.0\nNISPORT ${APCUPSD_PORT}\n" > /etc/apcupsd/apcupsd.conf
+        apcupsd -b -d1 &
+        APCUPSD_PID=$!
+        echo "  apcupsd installed and started (PID: ${APCUPSD_PID})"
     fi
 else
-    echo "  Warning: NUT entrypoint not found at /app/nut/entrypoint.sh"
+    echo ""
+    echo "Starting NUT service (UPS_BACKEND=nut)..."
+    if [ -f "/app/nut/entrypoint.sh" ]; then
+        cd /app/nut
+        bash /app/nut/entrypoint.sh &
+        NUT_PID=$!
+        echo "  NUT service started (PID: ${NUT_PID})"
+        # 等待 NUT 服务启动
+        sleep 5
+        # 验证进程是否仍在运行
+        if ! kill -0 ${NUT_PID} 2>/dev/null; then
+            echo "  Warning: NUT service process exited unexpectedly"
+        fi
+    else
+        echo "  Warning: NUT entrypoint not found at /app/nut/entrypoint.sh"
+    fi
 fi
 
 # 启动后端服务（前台运行）

@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import settings, get_config_manager, APP_VERSION
 from db.database import init_db, close_db
-from services.nut_client import create_nut_client
+from services.apcupsd_client import create_ups_client
 from services.lzc_shutdown import create_shutdown_client
 from services.shutdown_manager import ShutdownManager
 from services.monitor import UpsMonitor, set_monitor
@@ -93,14 +93,15 @@ async def lifespan(app: FastAPI):
     notify_channels = [NotifierConfig(**ch) for ch in config.notify_channels]
     notifier_service.configure(notify_channels, config.notify_events, config.notification_enabled)
 
-    # 创建 NUT 客户端
-    nut_client = create_nut_client(
-        settings.nut_host,
-        settings.nut_port,
-        settings.nut_username,
-        settings.nut_password,
-        settings.nut_ups_name,
-        settings.mock_mode
+    # 创建 UPS 客户端（根据配置选择后端）
+    ups_client = create_ups_client(
+        backend=settings.ups_backend,
+        host=settings.apcupsd_host if settings.ups_backend == "apcupsd" else settings.nut_host,
+        port=settings.apcupsd_port if settings.ups_backend == "apcupsd" else settings.nut_port,
+        username=settings.nut_username,
+        password=settings.nut_password,
+        ups_name=settings.nut_ups_name,
+        mock_mode=settings.mock_mode,
     )
     
     # 创建关机客户端
@@ -122,7 +123,7 @@ async def lifespan(app: FastAPI):
     
     # 创建监控器
     monitor = UpsMonitor(
-        nut_client,
+        ups_client,
         shutdown_manager,
         poll_interval=config.poll_interval_seconds,
         sample_interval=config.sample_interval_seconds,

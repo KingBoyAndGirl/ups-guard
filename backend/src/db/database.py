@@ -122,6 +122,17 @@ class Database:
             await self.conn.execute("CREATE INDEX IF NOT EXISTS idx_monitoring_stats_date ON monitoring_stats(date)")
             await self.conn.commit()
 
+            # Migration 5: Add power_watts and energy_kwh columns to metrics table
+            cursor = await self.conn.execute("PRAGMA table_info(metrics)")
+            columns = await cursor.fetchall()
+            column_names = [col[1] for col in columns]
+
+            if 'power_watts' not in column_names:
+                await self.conn.execute("ALTER TABLE metrics ADD COLUMN power_watts REAL")
+            if 'energy_kwh' not in column_names:
+                await self.conn.execute("ALTER TABLE metrics ADD COLUMN energy_kwh REAL")
+            await self.conn.commit()
+
         except Exception as e:
             logger.error(f"Error during migrations: {e}")
     

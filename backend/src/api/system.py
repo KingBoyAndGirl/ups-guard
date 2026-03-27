@@ -802,19 +802,74 @@ async def get_diagnostics():
         # 获取 UPS 状态
         monitor = get_monitor()
         ups_status = {}
+        ups_raw_variables = {}
+        ups_writable_vars = {}
+        ups_supported_commands = []
         if monitor:
             ups_data = monitor.get_current_data()
             if ups_data:
                 ups_status = {
                     "status": ups_data.status.value,
+                    "status_raw": ups_data.status_raw,
+                    "status_flags": ups_data.status_flags,
                     "battery_charge": ups_data.battery_charge,
                     "battery_runtime": ups_data.battery_runtime,
                     "input_voltage": ups_data.input_voltage,
                     "output_voltage": ups_data.output_voltage,
                     "load_percent": ups_data.load_percent,
+                    "temperature": ups_data.temperature,
                     "model": ups_data.ups_model,
-                    "manufacturer": ups_data.ups_manufacturer
+                    "manufacturer": ups_data.ups_manufacturer,
+                    "serial": ups_data.ups_serial,
+                    "battery_type": ups_data.battery_type,
+                    "battery_voltage": ups_data.battery_voltage,
+                    "battery_voltage_nominal": ups_data.battery_voltage_nominal,
+                    "battery_charge_low": ups_data.battery_charge_low,
+                    "battery_runtime_low": ups_data.battery_runtime_low,
+                    "battery_charger_status": ups_data.battery_charger_status,
+                    "battery_mfr_date": ups_data.battery_mfr_date,
+                    "ups_realpower_nominal": ups_data.ups_realpower_nominal,
+                    "input_voltage_nominal": ups_data.input_voltage_nominal,
+                    "input_sensitivity": ups_data.input_sensitivity,
+                    "input_transfer_low": ups_data.input_transfer_low,
+                    "input_transfer_high": ups_data.input_transfer_high,
+                    "input_transfer_reason": ups_data.input_transfer_reason,
+                    "ups_beeper_status": ups_data.ups_beeper_status,
+                    "ups_test_result": ups_data.ups_test_result,
+                    "ups_delay_shutdown": ups_data.ups_delay_shutdown,
+                    "runtime_estimated": ups_data.runtime_estimated,
+                    "transfer_count": ups_data.transfer_count,
+                    "time_on_battery": ups_data.time_on_battery,
+                    "cumulative_on_battery": ups_data.cumulative_on_battery,
+                    "ups_alarm_del": ups_data.ups_alarm_del,
+                    "ups_backend": ups_data.ups_backend,
+                    "ups_starttime": ups_data.ups_starttime,
+                    "last_update": ups_data.last_update.isoformat() if ups_data.last_update else None,
                 }
+
+            # 获取原始 UPS 变量
+            try:
+                client = monitor.nut_client
+                if hasattr(client, 'list_vars'):
+                    ups_raw_variables = await client.list_vars()
+            except Exception as e:
+                ups_raw_variables = {"error": str(e)}
+
+            # 获取可写变量
+            try:
+                client = monitor.nut_client
+                if hasattr(client, 'list_rw'):
+                    ups_writable_vars = await client.list_rw()
+            except Exception:
+                pass
+
+            # 获取支持的命令
+            try:
+                client = monitor.nut_client
+                if hasattr(client, 'list_commands'):
+                    ups_supported_commands = await client.list_commands()
+            except Exception:
+                pass
         
         # 获取完整配置（脱敏）用于复现用户环境
         config_manager = await get_config_manager()
@@ -902,6 +957,17 @@ async def get_diagnostics():
             "reproduction_instructions": "要复现此环境，请使用 Settings 页面的「导入配置」功能导入 full_config 字段的内容",
             "system_info": system_info,
             "ups_status": ups_status,
+            "ups_raw_variables": ups_raw_variables,
+            "ups_writable_variables": ups_writable_vars,
+            "ups_supported_commands": ups_supported_commands,
+            "backend_config": {
+                "ups_backend": settings.ups_backend,
+                "nut_host": settings.nut_host if settings.ups_backend == "nut" else None,
+                "nut_port": settings.nut_port if settings.ups_backend == "nut" else None,
+                "apcupsd_host": settings.apcupsd_host if settings.ups_backend == "apcupsd" else None,
+                "apcupsd_port": settings.apcupsd_port if settings.ups_backend == "apcupsd" else None,
+                "mock_mode": settings.mock_mode,
+            },
             "config_summary": config_summary,
             "full_config": full_config_masked,
             "recent_events": recent_events,
@@ -1442,11 +1508,12 @@ async def update_api_token(payload: dict):
     persist_api_token(new_token)
 
     # 2. 热更新中间件中的 Token
-    try:
-        from main import auth_middleware
-        auth_middleware.api_token = new_token
-    except ImportError:
-        logger.warning("Cannot hot-update auth middleware token")
+    from middleware.auth import get_auth_middleware
+    middleware = get_auth_middleware()
+    if middleware:
+        middleware.api_token = new_token
+    else:
+        logger.warning("Cannot hot-update auth middleware: instance not found")
 
     logger.info("API Token updated via Web UI")
 

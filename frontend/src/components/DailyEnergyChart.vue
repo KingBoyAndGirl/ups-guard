@@ -1,5 +1,5 @@
 <template>
-  <div class="daily-energy-card card" v-if="stats">
+  <div class="daily-energy-card card" :class="{ dark: isDark }" v-if="stats">
     <div class="card-header">
       <h3 class="card-title">📊 选中范围统计</h3>
       <span class="stats-badge">共 {{ dailyData.length }} 天</span>
@@ -53,6 +53,8 @@ const props = defineProps<{
 }>()
 
 const { effectiveTheme } = useTheme()
+
+const isDark = computed(() => effectiveTheme.value === 'dark')
 
 function parseTimestamp(isoString: string): Date {
   if (!isoString.endsWith('Z') && !isoString.match(/[+-]\d{2}:\d{2}$/)) {
@@ -145,17 +147,17 @@ const stats = computed(() => {
 })
 
 const chartOption = computed(() => {
-  const isDark = effectiveTheme.value === 'dark'
-  const textColor = isDark ? '#D1D5DB' : '#6B7280'
-  const axisLineColor = isDark ? '#374151' : '#E5E7EB'
+  const dark = isDark.value
+  const textColor = dark ? '#D1D5DB' : '#6B7280'
+  const axisLineColor = dark ? '#374151' : '#E5E7EB'
   const barColor = '#3B82F6'
-  
+
   return {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis',
-      backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
-      borderColor: isDark ? '#374151' : '#E5E7EB',
+      backgroundColor: dark ? '#1F2937' : '#FFFFFF',
+      borderColor: dark ? '#374151' : '#E5E7EB',
       textStyle: { color: textColor },
       formatter: (params: any) => {
         const p = params[0]
@@ -271,11 +273,28 @@ const chartOption = computed(() => {
   height: 240px;
 }
 
-:root.dark .stat-value {
+/* 夜间模式 */
+.daily-energy-card.dark {
+  background: #1F2937;
+  border-color: #374151;
+}
+.daily-energy-card.dark .card-title {
   color: #F3F4F6;
 }
-:root.dark .stat-value small,
-:root.dark .stat-value .date {
+.daily-energy-card.dark .stat-label {
   color: #9CA3AF;
+}
+.daily-energy-card.dark .stat-value {
+  color: #F3F4F6;
+}
+.daily-energy-card.dark .stat-value small,
+.daily-energy-card.dark .stat-value .date {
+  color: #9CA3AF;
+}
+.daily-energy-card.dark .stat-item {
+  background: rgba(59, 130, 246, 0.15);
+}
+.daily-energy-card.dark .stat-item.highlight {
+  background: rgba(245, 158, 11, 0.15);
 }
 </style>

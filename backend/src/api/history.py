@@ -152,7 +152,7 @@ async def export_csv(history_service, data_type: str, start_dt: datetime, end_dt
         events = await history_service.get_events(days, None)
         
         # 过滤日期范围
-        filtered_events = [e for e in events if start_dt <= e.timestamp <= end_dt]
+        filtered_events = [e for e in events if start_dt <= e.timestamp.replace(tzinfo=None) <= end_dt]
         
         writer = csv.writer(output)
         writer.writerow(['时间', '事件类型', '描述'])
@@ -172,8 +172,8 @@ async def export_csv(history_service, data_type: str, start_dt: datetime, end_dt
         hours = int((end_dt - start_dt).total_seconds() / 3600) + 1
         metrics = await history_service.get_metrics(hours)
         
-        # 过滤日期范围
-        filtered_metrics = [m for m in metrics if start_dt <= m.timestamp <= end_dt]
+        # 过滤日期范围（统一转为无时区比较）
+        filtered_metrics = [m for m in metrics if start_dt <= m.timestamp.replace(tzinfo=None) <= end_dt]
         
         writer = csv.writer(output)
         if data_type == "all":
@@ -227,7 +227,7 @@ async def export_xlsx(history_service, data_type: str, start_dt: datetime, end_d
         # 获取并写入数据
         days = (end_dt - start_dt).days + 1
         events = await history_service.get_events(days, None)
-        filtered_events = [e for e in events if start_dt <= e.timestamp <= end_dt]
+        filtered_events = [e for e in events if start_dt <= e.timestamp.replace(tzinfo=None) <= end_dt]
         
         for event in filtered_events:
             ws_events.append([
@@ -269,7 +269,7 @@ async def export_xlsx(history_service, data_type: str, start_dt: datetime, end_d
         # 获取并写入数据
         hours = int((end_dt - start_dt).total_seconds() / 3600) + 1
         metrics = await history_service.get_metrics(hours)
-        filtered_metrics = [m for m in metrics if start_dt <= m.timestamp <= end_dt]
+        filtered_metrics = [m for m in metrics if start_dt <= m.timestamp.replace(tzinfo=None) <= end_dt]
 
         for metric in filtered_metrics:
             ws_metrics.append([

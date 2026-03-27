@@ -34,6 +34,7 @@ use([
 const props = defineProps<{
   title: string
   metrics: Metric[]
+  upsNominalPower?: number  // UPS 标称功率 (W)，用于在 power_watts 为 null 时估算
 }>()
 
 const { effectiveTheme } = useTheme()
@@ -218,7 +219,14 @@ const chartOption = computed(() => {
         name: '功率(W)',
         type: 'line',
         yAxisIndex: 2,
-        data: props.metrics.map(m => m.power_watts !== undefined ? (m.power_watts != null ? Math.round(m.power_watts * 10) / 10 : null) : null),
+        data: props.metrics.map(m => {
+          if (m.power_watts != null) return Math.round(m.power_watts * 10) / 10
+          // 从 load_percent 和标称功率估算
+          if (m.load_percent != null && props.upsNominalPower) {
+            return Math.round(props.upsNominalPower * m.load_percent) / 10
+          }
+          return null
+        }),
         smooth: true,
         lineStyle: { color: '#F472B6', width: 2 },
         itemStyle: { color: '#F472B6' },

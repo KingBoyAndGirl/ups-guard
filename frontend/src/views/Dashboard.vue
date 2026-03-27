@@ -1240,7 +1240,7 @@
               @dragover.prevent="(e) => handleCardDragOver(e, colKey, cardIndex)"
             >
               <div class="drag-handle" title="拖拽调整位置"><span class="drag-icon">⋮⋮</span></div>
-              <PowerChart v-if="upsData" title="功率趋势" :metrics="metrics" />
+              <PowerChart v-if="upsData" title="功率趋势" :metrics="metrics" :upsNominalPower="upsData.ups_realpower_nominal || undefined" />
             </div>
 
             <!-- 电池寿命预测卡片 -->

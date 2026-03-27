@@ -78,7 +78,6 @@ const dailyData = computed(() => {
 
   const nominal = props.upsNominalPower || 1024
   const dailyWh = new Map<string, number>()
-  const dailyHours = new Map<string, number>()  // 追踪每天累计时长
 
   for (let i = 1; i < props.metrics.length; i++) {
     const m = props.metrics[i]
@@ -95,16 +94,13 @@ const dailyData = computed(() => {
       if (watts != null) {
         const dateKey = formatDateFull(currTime)
         dailyWh.set(dateKey, (dailyWh.get(dateKey) || 0) + watts * dtHours)
-        dailyHours.set(dateKey, (dailyHours.get(dateKey) || 0) + dtHours)
       }
     }
   }
 
-  // 只保留完整日（≥20小时数据，容许采样间隔）
+  // 统计所有天（边界日按实际数据时段计算）
   const result: { date: string; dateShort: string; kwh: number }[] = []
   for (const [date, wh] of dailyWh) {
-    const hours = dailyHours.get(date) || 0
-    if (hours < 20) continue  // 跳过不完整的首尾日
     const d = new Date(date)
     result.push({
       date,

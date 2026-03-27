@@ -78,19 +78,20 @@ const chartOption = computed(() => {
     },
     legend: {
       data: ['电池电量', '负载百分比', '输入电压', '输出电压(推算)', '功率(W)', '用电量(kWh)'],
-      bottom: 4,
+      bottom: 8,
       textStyle: {
         color: textColor,
-        fontSize: 11
+        fontSize: 12
       },
-      itemGap: 10,
-      itemWidth: 14,
-      itemHeight: 8
+      itemGap: 20,
+      itemWidth: 16,
+      itemHeight: 10,
+      selectedMode: false
     },
     grid: {
       left: '3%',
       right: '4%',
-      bottom: '14%',
+      bottom: '18%',
       top: '4%',
       containLabel: false
     },
@@ -263,11 +264,11 @@ const chartOption = computed(() => {
 
 <style scoped>
 .power-chart {
-  min-height: 440px;
+  min-height: 480px;
 }
 
 .chart {
   width: 100%;
-  height: 400px;
+  height: 430px;
 }
 </style>

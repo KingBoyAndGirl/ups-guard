@@ -129,31 +129,7 @@ const chartOption = computed(() => {
     return new Date(isoString.endsWith('Z') ? isoString : isoString + 'Z')
   }
 
-  // 计算累积用电量(kWh)数据
-  const energyData: (number | null)[] = []
   const nominal = props.upsNominalPower || 1024
-  let cumulativeWh = 0
-  for (let i = 0; i < props.metrics.length; i++) {
-    const m = props.metrics[i]
-    if (i > 0) {
-      const prev = props.metrics[i - 1]
-      const currTime = parseTimestamp(m.timestamp)
-      const prevTime = parseTimestamp(prev.timestamp)
-      const dtHours = (currTime.getTime() - prevTime.getTime()) / 3600000
-      if (dtHours > 0 && dtHours < 2) {  // 间隔超过2小时说明有断点，跳过
-        let watts = m.power_watts
-        if (watts == null && m.load_percent != null) {
-          watts = nominal * m.load_percent / 100
-        }
-        if (watts != null) {
-          cumulativeWh += watts * dtHours
-        }
-      }
-    }
-    energyData.push(Math.round(cumulativeWh) / 1000)  // Wh → kWh
-  }
-  // 计算最大值用于 y 轴缩放
-  const maxEnergy = energyData.length > 0 ? Math.ceil(Math.max(...energyData.filter((v): v is number => v != null)) * 1.1 * 100) / 100 : 1
   
   // 根据主题设置颜色
   const isDark = effectiveTheme.value === 'dark'
@@ -185,8 +161,6 @@ const chartOption = computed(() => {
               watts = nominal * m.load_percent / 100
             }
             html += `${p.marker} 功率: <b>${watts != null ? (Math.round(watts * 10) / 10) + 'W' : 'N/A'}</b><br/>`
-          } else if (p.seriesName === '用电量(kWh)') {
-            html += `${p.marker} 累计用电: <b>${p.value != null ? p.value.toFixed(3) + ' 度' : 'N/A'}</b><br/>`
           } else {
             html += `${p.marker} ${p.seriesName}: <b>${p.value != null ? p.value : 'N/A'}</b><br/>`
           }
@@ -195,7 +169,7 @@ const chartOption = computed(() => {
       }
     },
     legend: {
-      data: ['电池电量', '负载百分比', '输入电压', '输出电压(推算)', '功率(W)', '用电量(kWh)'],
+      data: ['电池电量', '负载百分比', '输入电压', '输出电压(推算)', '功率(W)'],
       bottom: 8,
       textStyle: {
         color: textColor,
@@ -261,29 +235,6 @@ const chartOption = computed(() => {
         axisLine: {
           lineStyle: {
             color: '#3B82F6'
-          }
-        },
-        axisLabel: {
-          color: textColor,
-          formatter: '{value}'
-        },
-        splitLine: {
-          show: false
-        },
-        nameTextStyle: {
-          color: textColor,
-          fontSize: 11
-        }
-      },
-      {
-        type: 'value',
-        name: '用电量(kWh)',
-        min: 0,
-        position: 'right',
-        offset: 45,
-        axisLine: {
-          lineStyle: {
-            color: '#F59E0B'
           }
         },
         axisLabel: {
@@ -375,24 +326,6 @@ const chartOption = computed(() => {
           }
         }
       },
-      {
-        name: '用电量(kWh)',
-        type: 'line',
-        yAxisIndex: 2,
-        data: energyData,
-        smooth: true,
-        lineStyle: { color: '#F59E0B', width: 2 },
-        itemStyle: { color: '#F59E0B' },
-        areaStyle: {
-          color: {
-            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(245,158,11,0.15)' },
-              { offset: 1, color: 'rgba(245,158,11,0.02)' }
-            ]
-          }
-        }
-      }
     ]
   }
 })

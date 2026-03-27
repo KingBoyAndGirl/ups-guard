@@ -21,11 +21,16 @@
         <div v-if="loadingMetrics" class="loading-state">
           <span>加载中...</span>
         </div>
-        <PowerChart
-          v-else-if="metrics.length > 0"
-          title=""
-          :metrics="metrics"
-        />
+        <template v-else-if="metrics.length > 0">
+          <PowerChart
+            title=""
+            :metrics="metrics"
+          />
+          <DailyEnergyChart
+            :metrics="metrics"
+            :upsNominalPower="undefined"
+          />
+        </template>
         <p v-else class="empty-state">暂无历史数据</p>
       </div>
 
@@ -433,6 +438,7 @@ import axios from 'axios'
 // 使用异步组件加载 ECharts，提升首屏加载速度
 const PowerChart = defineAsyncComponent(() => import('@/components/PowerChart.vue'))
 import DateRangePicker from '@/components/DateRangePicker.vue'
+import DailyEnergyChart from '@/components/DailyEnergyChart.vue'
 import type { Metric } from '@/types/ups'
 import { useToast } from '@/composables/useToast'
 

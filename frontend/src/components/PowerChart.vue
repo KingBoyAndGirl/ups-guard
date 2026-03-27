@@ -2,8 +2,10 @@
   <div class="power-chart card">
     <div class="card-header">
       <h3 class="card-title">{{ title }}</h3>
-      <span v-if="todayEnergy !== null" class="today-energy">今日用电: {{ todayEnergy }} 度</span>
-      <span v-else-if="props.metrics.length" class="today-energy today-energy-warn">今日用电: 数据不足</span>
+      <template v-if="props.showTodayEnergy">
+        <span v-if="todayEnergy !== null" class="today-energy">今日用电: {{ todayEnergy }} 度</span>
+        <span v-else-if="props.metrics.length" class="today-energy today-energy-warn">今日用电: 数据不足</span>
+      </template>
     </div>
     <v-chart class="chart" :option="chartOption" autoresize />
   </div>
@@ -39,6 +41,7 @@ const props = defineProps<{
   title: string
   metrics: Metric[]
   upsNominalPower?: number  // UPS 标称功率 (W)，用于在 power_watts 为 null 时估算
+  showTodayEnergy?: boolean  // 是否显示今日用电（默认不显示）
 }>()
 
 const { effectiveTheme } = useTheme()

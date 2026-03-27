@@ -77,7 +77,7 @@ const chartOption = computed(() => {
       }
     },
     legend: {
-      data: ['电池电量', '负载百分比', '输入电压', '输出电压', '功率(W)', '用电量(kWh)'],
+      data: ['电池电量', '负载百分比', '输入电压', '输出电压(推算)', '功率(W)', '用电量(kWh)'],
       textStyle: {
         color: textColor
       }
@@ -207,12 +207,18 @@ const chartOption = computed(() => {
         itemStyle: { color: '#3B82F6' }
       },
       {
-        name: '输出电压',
+        name: '输出电压(推算)',
         type: 'line',
         yAxisIndex: 1,
-        data: props.metrics.map(m => m.output_voltage),
+        data: props.metrics.map(m => {
+          // 后端有值直接用
+          if (m.output_voltage != null) return Math.round(m.output_voltage * 10) / 10
+          // 前端推算：输出电压 ≈ 输入电压（线路交互式 UPS 在线时压降可忽略）
+          if (m.input_voltage != null) return Math.round(m.input_voltage * 10) / 10
+          return null
+        }),
         smooth: true,
-        lineStyle: { color: '#8B5CF6' },
+        lineStyle: { color: '#8B5CF6', type: 'dashed' },
         itemStyle: { color: '#8B5CF6' }
       },
       {

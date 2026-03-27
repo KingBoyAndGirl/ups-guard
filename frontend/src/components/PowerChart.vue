@@ -92,11 +92,11 @@ const chartOption = computed(() => {
       selectedMode: false
     },
     grid: {
-      left: '3%',
-      right: '4%',
+      left: '10%',
+      right: '10%',
       bottom: '18%',
       top: '4%',
-      containLabel: false
+      containLabel: true
     },
     xAxis: {
       type: 'category',

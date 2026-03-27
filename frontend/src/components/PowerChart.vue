@@ -1,6 +1,9 @@
 <template>
   <div class="power-chart card">
-    <h3 class="card-title">{{ title }}</h3>
+    <div class="card-header">
+      <h3 class="card-title">{{ title }}</h3>
+      <span v-if="todayEnergy !== null" class="today-energy">今日用电: {{ todayEnergy }} 度</span>
+    </div>
     <v-chart class="chart" :option="chartOption" autoresize />
   </div>
 </template>
@@ -39,6 +42,26 @@ const props = defineProps<{
 
 const { effectiveTheme } = useTheme()
 
+// 今日用电量（度）
+const todayEnergy = computed(() => {
+  if (!props.metrics.length) return null
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const now = new Date()
+  const midnightStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T00:00:00`
+  const todayStart = props.metrics.find(m => {
+    const ts = m.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+    return ts >= midnightStr && m.energy_kwh != null
+  })
+  const beforeStart = [...props.metrics].reverse().find(m => {
+    const ts = m.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+    return ts < midnightStr && m.energy_kwh != null
+  })
+  const baseline = todayStart?.energy_kwh ?? beforeStart?.energy_kwh ?? 0
+  const latest = [...props.metrics].reverse().find(m => m.energy_kwh != null)
+  if (!latest) return null
+  return (latest.energy_kwh - baseline).toFixed(2)
+})
+
 const chartOption = computed(() => {
   // Parse timestamps correctly - backend sends naive datetime (no timezone)
   const timestamps = props.metrics.map(m => {
@@ -63,27 +86,6 @@ const chartOption = computed(() => {
   const textColor = isDark ? '#D1D5DB' : '#6B7280'
   const axisLineColor = isDark ? '#374151' : '#E5E7EB'
 
-  // 今日用电基准：找到今天 00:00 的 energy_kwh 读数
-  // 以当前最新数据的日期来确定"今天"
-  const now = new Date()
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-  const midnightStr = midnight.toISOString().slice(0, 19)  // "2026-03-27T00:00:00"
-
-  // 找今天 00:00 之后最早的一条数据作为基准
-  const todayMetrics = props.metrics.filter(m => {
-    const ts = m.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
-    return ts >= midnightStr
-  })
-  // 也找今天 00:00 之前最后一条数据（如果今天没有零点记录）
-  const beforeMidnight = [...props.metrics].reverse().find(m => {
-    const ts = m.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
-    return ts < midnightStr && m.energy_kwh != null
-  })
-
-  const baselineEnergy = (todayMetrics.find(m => m.energy_kwh != null)?.energy_kwh)
-    ?? (beforeMidnight?.energy_kwh)
-    ?? 0
-  
   return {
     backgroundColor: 'transparent',
     tooltip: {
@@ -98,7 +100,7 @@ const chartOption = computed(() => {
       }
     },
     legend: {
-      data: ['电池电量', '负载百分比', '输入电压', '输出电压(推算)', '功率(W)', '今日用电(度)'],
+      data: ['电池电量', '负载百分比', '输入电压', '输出电压(推算)', '功率(W)'],
       bottom: 8,
       textStyle: {
         color: textColor,
@@ -106,14 +108,13 @@ const chartOption = computed(() => {
       },
       itemGap: 20,
       itemWidth: 16,
-      itemHeight: 10,
-      selectedMode: false
+      itemHeight: 10
     },
     grid: {
-      left: '10%',
-      right: '10%',
+      left: '7%',
+      right: '7%',
       bottom: '18%',
-      top: '4%',
+      top: '8%',
       containLabel: true
     },
     xAxis: {
@@ -269,28 +270,7 @@ const chartOption = computed(() => {
           }
         }
       },
-      {
-        name: '今日用电(度)',
-        type: 'line',
-        yAxisIndex: 0,
-        data: props.metrics.map(m => {
-          if (m.energy_kwh == null) return null
-          const todayKwh = m.energy_kwh - baselineEnergy
-          return Math.round(todayKwh * 100) / 100  // 两位小数，单位：度
-        }),
-        smooth: true,
-        lineStyle: { color: '#06B6D4', width: 2, type: 'dashed' },
-        itemStyle: { color: '#06B6D4' },
-        tooltip: {
-          formatter: (params: any) => {
-            const idx = params.dataIndex
-            const m = props.metrics[idx]
-            if (m.energy_kwh == null) return ''
-            const todayKwh = Math.round((m.energy_kwh - baselineEnergy) * 100) / 100
-            return `${params.marker} 今日用电(度): <b>${todayKwh}</b>`
-          }
-        }
-      }
+      // 今日用电不在图表上显示（数值太小），只在标题和tooltip中展示
     ]
   }
 })
@@ -299,6 +279,19 @@ const chartOption = computed(() => {
 <style scoped>
 .power-chart {
   min-height: 480px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.today-energy {
+  font-size: 13px;
+  color: #06B6D4;
+  font-weight: 500;
 }
 
 .chart {

@@ -63,8 +63,26 @@ const chartOption = computed(() => {
   const textColor = isDark ? '#D1D5DB' : '#6B7280'
   const axisLineColor = isDark ? '#374151' : '#E5E7EB'
 
-  // 今日用电基准：第一条有 energy_kwh 的数据
-  const baselineEnergy = props.metrics.find(m => m.energy_kwh != null)?.energy_kwh ?? 0
+  // 今日用电基准：找到今天 00:00 的 energy_kwh 读数
+  // 以当前最新数据的日期来确定"今天"
+  const now = new Date()
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+  const midnightStr = midnight.toISOString().slice(0, 19)  // "2026-03-27T00:00:00"
+
+  // 找今天 00:00 之后最早的一条数据作为基准
+  const todayMetrics = props.metrics.filter(m => {
+    const ts = m.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+    return ts >= midnightStr
+  })
+  // 也找今天 00:00 之前最后一条数据（如果今天没有零点记录）
+  const beforeMidnight = [...props.metrics].reverse().find(m => {
+    const ts = m.timestamp.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+    return ts < midnightStr && m.energy_kwh != null
+  })
+
+  const baselineEnergy = (todayMetrics.find(m => m.energy_kwh != null)?.energy_kwh)
+    ?? (beforeMidnight?.energy_kwh)
+    ?? 0
   
   return {
     backgroundColor: 'transparent',
@@ -269,7 +287,7 @@ const chartOption = computed(() => {
             const m = props.metrics[idx]
             if (m.energy_kwh == null) return ''
             const todayKwh = Math.round((m.energy_kwh - baselineEnergy) * 100) / 100
-            return `${params.marker} 今日用电: <b>${todayKwh} 度</b>`
+            return `${params.marker} 今日用电(度): <b>${todayKwh}</b>`
           }
         }
       }

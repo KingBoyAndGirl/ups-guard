@@ -62,6 +62,9 @@ const chartOption = computed(() => {
   const isDark = effectiveTheme.value === 'dark'
   const textColor = isDark ? '#D1D5DB' : '#6B7280'
   const axisLineColor = isDark ? '#374151' : '#E5E7EB'
+
+  // 今日用电基准：第一条有 energy_kwh 的数据
+  const baselineEnergy = props.metrics.find(m => m.energy_kwh != null)?.energy_kwh ?? 0
   
   return {
     backgroundColor: 'transparent',
@@ -77,7 +80,7 @@ const chartOption = computed(() => {
       }
     },
     legend: {
-      data: ['电池电量', '负载百分比', '输入电压', '输出电压(推算)', '功率(W)', '用电量(kWh)'],
+      data: ['电池电量', '负载百分比', '输入电压', '输出电压(推算)', '功率(W)', '今日用电(度)'],
       bottom: 8,
       textStyle: {
         color: textColor,
@@ -249,13 +252,26 @@ const chartOption = computed(() => {
         }
       },
       {
-        name: '用电量(kWh)',
+        name: '今日用电(度)',
         type: 'line',
         yAxisIndex: 0,
-        data: props.metrics.map(m => m.energy_kwh != null ? Math.round(m.energy_kwh * 10) / 10 : null),
+        data: props.metrics.map(m => {
+          if (m.energy_kwh == null) return null
+          const todayKwh = m.energy_kwh - baselineEnergy
+          return Math.round(todayKwh * 100) / 100  // 两位小数，单位：度
+        }),
         smooth: true,
         lineStyle: { color: '#06B6D4', width: 2, type: 'dashed' },
-        itemStyle: { color: '#06B6D4' }
+        itemStyle: { color: '#06B6D4' },
+        tooltip: {
+          formatter: (params: any) => {
+            const idx = params.dataIndex
+            const m = props.metrics[idx]
+            if (m.energy_kwh == null) return ''
+            const todayKwh = Math.round((m.energy_kwh - baselineEnergy) * 100) / 100
+            return `${params.marker} 今日用电: <b>${todayKwh} 度</b>`
+          }
+        }
       }
     ]
   }

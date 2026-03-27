@@ -110,7 +110,7 @@ const chartOption = computed(() => {
     yAxis: [
       {
         type: 'value',
-        name: '百分比 (%)',
+        name: '百分比',
         min: 0,
         max: 100,
         position: 'left',
@@ -120,60 +120,41 @@ const chartOption = computed(() => {
           }
         },
         axisLabel: {
-          color: textColor
+          color: textColor,
+          formatter: '{value}'
         },
         splitLine: {
           lineStyle: {
-            color: axisLineColor
+            color: axisLineColor,
+            type: 'dashed'
           }
         },
         nameTextStyle: {
-          color: textColor
+          color: textColor,
+          fontSize: 11
         }
       },
       {
         type: 'value',
-        name: '电压 (V)',
-        min: 0,
-        max: 250,
+        name: '电压(V)',
+        min: 200,
+        max: 240,
         position: 'right',
-        offset: 0,
         axisLine: {
           lineStyle: {
-            color: axisLineColor
+            color: '#3B82F6'
           }
         },
         axisLabel: {
-          color: textColor
-        },
-        splitLine: {
-          lineStyle: {
-            color: axisLineColor
-          }
-        },
-        nameTextStyle: {
-          color: textColor
-        }
-      },
-      {
-        type: 'value',
-        name: '功率 (W)',
-        min: 0,
-        position: 'right',
-        offset: 50,
-        axisLine: {
-          lineStyle: {
-            color: '#F472B6'
-          }
-        },
-        axisLabel: {
-          color: textColor
+          color: textColor,
+          formatter: '{value}'
         },
         splitLine: {
           show: false
         },
         nameTextStyle: {
-          color: textColor
+          color: textColor,
+          fontSize: 11
         }
       }
     ],
@@ -230,14 +211,15 @@ const chartOption = computed(() => {
       {
         name: '功率(W)',
         type: 'line',
-        yAxisIndex: 2,
+        yAxisIndex: 0,
         data: props.metrics.map(m => {
-          if (m.power_watts != null) return Math.round(m.power_watts * 10) / 10
-          // 从 load_percent 和标称功率估算
-          if (m.load_percent != null && props.upsNominalPower) {
-            return Math.round(props.upsNominalPower * m.load_percent) / 10
+          const nominal = props.upsNominalPower || 1000
+          let watts = m.power_watts
+          if (watts == null && m.load_percent != null) {
+            watts = nominal * m.load_percent / 100
           }
-          return null
+          // 归一化到百分比（占标称功率的%）
+          return watts != null ? Math.round(watts / nominal * 100 * 10) / 10 : null
         }),
         smooth: true,
         lineStyle: { color: '#F472B6', width: 2 },
@@ -250,13 +232,26 @@ const chartOption = computed(() => {
               { offset: 1, color: 'rgba(244,114,182,0.02)' }
             ]
           }
+        },
+        tooltip: {
+          // 实际功率值显示在 tooltip
+          formatter: (params: any) => {
+            const idx = params.dataIndex
+            const m = props.metrics[idx]
+            const nominal = props.upsNominalPower || 1000
+            let watts = m.power_watts
+            if (watts == null && m.load_percent != null) {
+              watts = nominal * m.load_percent / 100
+            }
+            return watts != null ? `${params.marker} 功率: <b>${Math.round(watts * 10) / 10}W</b>` : ''
+          }
         }
       },
       {
         name: '用电量(kWh)',
         type: 'line',
-        yAxisIndex: 1,
-        data: props.metrics.map(m => m.energy_kwh != null ? Math.round(m.energy_kwh * 1000) / 1000 : null),
+        yAxisIndex: 0,
+        data: props.metrics.map(m => m.energy_kwh != null ? Math.round(m.energy_kwh * 10) / 10 : null),
         smooth: true,
         lineStyle: { color: '#06B6D4', width: 2, type: 'dashed' },
         itemStyle: { color: '#06B6D4' }

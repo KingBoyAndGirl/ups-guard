@@ -97,10 +97,36 @@ const chartOption = computed(() => {
       const minute = parseInt(parts[4] || '0')
       const second = parseInt(parts[5] || '0')
       const date = new Date(year, month, day, hour, minute, second)
-      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+      // 根据数据跨度选择格式
+      return formatTimestamp(date, props.metrics)
     }
-    return new Date(isoString).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+    const date = new Date(isoString.endsWith('Z') ? isoString : isoString + 'Z')
+    return formatTimestamp(date, props.metrics)
   })
+
+  // 格式化时间戳：跨天时显示日期+时间
+  function formatTimestamp(date: Date, metrics: Metric[]) {
+    if (metrics.length < 2) return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+    // 检查是否跨天
+    const first = parseTimestamp(metrics[0].timestamp)
+    const last = parseTimestamp(metrics[metrics.length - 1].timestamp)
+    const spanHours = (last.getTime() - first.getTime()) / 3600000
+    if (spanHours > 24) {
+      // 跨天，显示 MM-DD HH:mm
+      const pad = (n: number) => String(n).padStart(2, '0')
+      return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+    }
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+  }
+
+  function parseTimestamp(isoString: string): Date {
+    if (!isoString.endsWith('Z') && !isoString.match(/[+-]\d{2}:\d{2}$/)) {
+      const parts = isoString.split(/[-T:.]/)
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]),
+        parseInt(parts[3] || '0'), parseInt(parts[4] || '0'), parseInt(parts[5] || '0'))
+    }
+    return new Date(isoString.endsWith('Z') ? isoString : isoString + 'Z')
+  }
   
   // 根据主题设置颜色
   const isDark = effectiveTheme.value === 'dark'

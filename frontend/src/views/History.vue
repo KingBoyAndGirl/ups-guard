@@ -785,13 +785,17 @@ const queryDataSilent = async () => {
     const response = await axios.get(`/api/history/metrics?${queryParam}`)
 
     // Filter results to only include data within the selected date range
+    // 前端发的是本地时间字符串，后端返回UTC时间戳，统一按UTC比较
     const startTime = start.getTime()
     const endTime = end.getTime()
-    
+
     metrics.value = response.data.metrics.filter((m: Metric) => {
-      // Parse the ISO timestamp from backend (which may be in UTC or server local time)
-      const timestamp = new Date(m.timestamp).getTime()
-      return timestamp >= startTime && timestamp <= endTime
+      // 后端时间戳是无时区格式 "2026-03-27 08:00:00"，按本地时间解析
+      const ts = m.timestamp.replace('T', ' ').replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
+      const parts = ts.split(/[-T:. ]/)
+      const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]),
+        parseInt(parts[3] || '0'), parseInt(parts[4] || '0'), parseInt(parts[5] || '0'))
+      return date.getTime() >= startTime && date.getTime() <= endTime
     })
   } catch (error) {
     console.error('Failed to query metrics:', error)
